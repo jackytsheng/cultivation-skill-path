@@ -53,7 +53,9 @@ button {
   min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 246, 0.94), rgba(244, 236, 219, 0.9)),
+    #f6eedc;
   color: var(--ink);
   cursor: pointer;
   transition:
@@ -64,6 +66,9 @@ button {
 
 button:hover {
   border-color: #b8b09e;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.98), rgba(239, 228, 203, 0.96)),
+    #f2e6cf;
 }
 
 button:active {
@@ -275,8 +280,6 @@ h3 {
 }
 
 .skill-row.active,
-.realm-pill.active,
-.layer-button.active,
 .profile-card:hover {
   border-color: var(--green);
   background: #f4fbf6;
@@ -325,6 +328,13 @@ h3 {
   font-weight: 800;
 }
 
+.primary-button:hover {
+  border-color: #285f47;
+  background:
+    linear-gradient(180deg, rgba(66, 142, 98, 0.96), rgba(43, 105, 75, 0.96)),
+    var(--green);
+}
+
 .danger-button {
   border-color: #e6c8c1;
   background: #fff8f6;
@@ -332,8 +342,13 @@ h3 {
   font-weight: 800;
 }
 
+.danger-button:hover {
+  border-color: #d5aaa0;
+  background: #fff0eb;
+}
+
 .danger-button.subtle {
-  background: #ffffff;
+  background: #fff6ef;
 }
 
 .skill-header {
@@ -404,15 +419,48 @@ h3 {
 
 .inline-form {
   display: grid;
-  grid-template-columns: minmax(120px, 200px) auto;
-  gap: 8px;
+  grid-template-columns: minmax(220px, 1fr) 82px;
+  gap: 6px;
+  width: min(100%, 430px);
+  padding: 5px;
+  border: 1px solid rgba(198, 171, 112, 0.58);
+  border-radius: 10px;
+  background: rgba(250, 243, 226, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.inline-form input {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+}
+
+.inline-form button {
+  min-height: 40px;
+  border-color: rgba(142, 103, 30, 0.5);
+  background:
+    linear-gradient(180deg, rgba(199, 157, 67, 0.96), rgba(153, 107, 28, 0.95)),
+    #b88425;
+  color: #fffdf6;
+  font-weight: 900;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 217, 0.42),
+    0 6px 12px rgba(97, 66, 17, 0.13);
+}
+
+.inline-form button:hover {
+  border-color: rgba(120, 82, 18, 0.64);
+  background:
+    linear-gradient(180deg, rgba(214, 172, 78, 0.98), rgba(162, 114, 32, 0.98)),
+    #bf8c2e;
 }
 
 .realm-list {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 2px 2px 8px;
 }
 
 .realm-pill {
@@ -420,9 +468,42 @@ h3 {
   grid-template-columns: max-content auto;
   gap: 12px;
   align-items: center;
+  min-height: 46px;
   min-width: 138px;
-  padding: 9px 10px;
+  border-color: rgba(198, 171, 112, 0.58);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 251, 239, 0.94), rgba(241, 231, 207, 0.92)),
+    #f5ecd7;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 6px 12px rgba(76, 58, 26, 0.07);
   white-space: nowrap;
+}
+
+.realm-pill.active {
+  border-color: rgba(67, 113, 82, 0.66);
+  background:
+    linear-gradient(180deg, rgba(246, 251, 242, 0.96), rgba(223, 235, 214, 0.95)),
+    #e8f2df;
+  box-shadow:
+    inset 0 0 0 1px rgba(72, 118, 88, 0.18),
+    0 7px 13px rgba(59, 94, 68, 0.1);
+}
+
+.realm-pill:hover {
+  border-color: rgba(177, 139, 70, 0.76);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 242, 0.98), rgba(235, 221, 193, 0.96)),
+    #efe1c3;
+}
+
+.realm-pill.active:hover {
+  border-color: rgba(67, 113, 82, 0.72);
+  background:
+    linear-gradient(180deg, rgba(247, 252, 242, 0.98), rgba(217, 233, 207, 0.98)),
+    #e1efd6;
 }
 
 .realm-pill b {
@@ -435,7 +516,13 @@ h3 {
 }
 
 .realm-pill.locked {
-  background: rgba(246, 241, 229, 0.5);
+  background: rgba(236, 230, 216, 0.66);
+  box-shadow: none;
+}
+
+.realm-pill.locked:hover {
+  border-color: rgba(184, 174, 154, 0.66);
+  background: rgba(232, 226, 213, 0.76);
 }
 
 .editor-grid {
@@ -472,15 +559,47 @@ h3 {
 .layer-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .layer-button {
   display: grid;
-  gap: 4px;
-  min-height: 64px;
-  padding: 8px;
+  gap: 6px;
+  min-height: 68px;
+  border-color: rgba(198, 171, 112, 0.58);
+  border-radius: 8px;
+  padding: 10px 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 242, 0.94), rgba(239, 228, 205, 0.92)),
+    #f4ead4;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 6px 12px rgba(76, 58, 26, 0.07);
   text-align: center;
+}
+
+.layer-button.active {
+  border-color: rgba(69, 117, 84, 0.68);
+  background:
+    linear-gradient(180deg, rgba(246, 252, 241, 0.98), rgba(219, 235, 210, 0.96)),
+    #e2efd7;
+  box-shadow:
+    inset 0 0 0 1px rgba(74, 124, 89, 0.2),
+    0 8px 14px rgba(59, 94, 68, 0.1);
+}
+
+.layer-button:hover {
+  border-color: rgba(177, 139, 70, 0.76);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 242, 0.98), rgba(235, 221, 193, 0.96)),
+    #efe1c3;
+}
+
+.layer-button.active:hover {
+  border-color: rgba(69, 117, 84, 0.72);
+  background:
+    linear-gradient(180deg, rgba(247, 252, 242, 0.98), rgba(217, 233, 207, 0.98)),
+    #e1efd6;
 }
 
 .layer-button span {
@@ -500,11 +619,37 @@ h3 {
   color: #a69b89;
 }
 
+.layer-button.locked.active {
+  border-color: rgba(172, 158, 131, 0.74);
+  background: rgba(237, 231, 216, 0.82);
+}
+
+.layer-button.locked:hover,
+.layer-button.locked.active:hover {
+  border-color: rgba(184, 174, 154, 0.66);
+  background: rgba(232, 226, 213, 0.76);
+}
+
 .jump-button,
 .add-task-button {
   width: 100%;
-  background: var(--surface-strong);
+  border-color: rgba(198, 171, 112, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.96), rgba(232, 218, 188, 0.95)),
+    var(--surface-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 7px 13px rgba(76, 58, 26, 0.07);
+  color: #5d4828;
   font-weight: 800;
+}
+
+.jump-button:hover,
+.add-task-button:hover {
+  border-color: rgba(177, 139, 70, 0.78);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 240, 0.98), rgba(224, 206, 165, 0.96)),
+    #ead8ae;
 }
 
 .task-list {
@@ -574,6 +719,30 @@ h3 {
   padding: 0;
   font-size: 18px;
   font-weight: 900;
+}
+
+.task-actions button {
+  border-color: rgba(198, 171, 112, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.96), rgba(235, 223, 197, 0.95)),
+    #f3e6ca;
+  color: #5d4828;
+}
+
+.task-actions .primary-button {
+  border-color: var(--green);
+  background:
+    linear-gradient(180deg, rgba(64, 135, 95, 0.96), rgba(42, 105, 74, 0.96)),
+    var(--green);
+  color: #fffdf8;
+}
+
+.task-actions .danger-button {
+  border-color: rgba(178, 96, 69, 0.42);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 240, 0.96), rgba(245, 224, 216, 0.95)),
+    #fae7df;
+  color: var(--red);
 }
 
 .profile-page,
