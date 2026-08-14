@@ -410,6 +410,26 @@ function skillStats(skill: Skill): SkillStats {
   };
 }
 
+function realmStats(realm: Realm): TaskStats {
+  const stats = realm.layers.map(layerStats);
+  const total = stats.reduce((sum, item) => sum + item.total, 0);
+  const done = stats.reduce((sum, item) => sum + item.done, 0);
+  return {
+    done,
+    total,
+    percent: total === 0 ? 0 : Math.round((done / total) * 100),
+    complete: total > 0 && done >= total,
+  };
+}
+
+function visibleRealmWindow(realms: Realm[], currentIndex: number) {
+  if (realms.length <= 10) {
+    return realms;
+  }
+  const start = Math.max(0, Math.min(currentIndex - 4, realms.length - 10));
+  return realms.slice(start, start + 10);
+}
+
 function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -633,6 +653,51 @@ function StatBox({
   );
 }
 
+function PanelHeading({ title, tone = "green" }: { title: string; tone?: string }) {
+  return (
+    <div className="panel-heading">
+      <span className={`heading-diamond ${tone}`} aria-hidden="true" />
+      <h2>{title}</h2>
+    </div>
+  );
+}
+
+function ScrollEmblem() {
+  return (
+    <div className="scroll-emblem" aria-hidden="true">
+      <div className="scroll-sun" />
+      <div className="scroll-mountain back" />
+      <div className="scroll-mountain front" />
+      <div className="scroll-cloud" />
+    </div>
+  );
+}
+
+function MetricCard({
+  tone,
+  icon,
+  label,
+  value,
+  caption,
+}: {
+  tone: string;
+  icon: string;
+  label: string;
+  value: number;
+  caption: string;
+}) {
+  return (
+    <div className={`metric-card ${tone}`}>
+      <span className="metric-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{caption}</small>
+    </div>
+  );
+}
+
 export function CultivationApp() {
   const [state, setState] = useState<AppState>(() => createDefaultState());
   const [loaded, setLoaded] = useState(false);
@@ -667,6 +732,35 @@ export function CultivationApp() {
   const profileStats = useMemo(
     () => state.skills.map((skill) => ({ skill, stats: skillStats(skill) })),
     [state.skills],
+  );
+  const currentRealmIndex = Math.max(
+    0,
+    activeSkill?.realms.findIndex(
+      (realm) => realm.id === activeStats?.currentRealm?.id,
+    ) ?? 0,
+  );
+  const visibleRealms = activeSkill
+    ? visibleRealmWindow(activeSkill.realms, currentRealmIndex)
+    : [];
+  const activeTasks = useMemo(
+    () =>
+      activeSkill
+        ? activeSkill.realms.flatMap((realm) =>
+            realm.layers.flatMap((layer) => layer.tasks),
+          )
+        : [],
+    [activeSkill],
+  );
+  const taskOverview = useMemo(
+    () => ({
+      total: activeTasks.length,
+      doing: activeTasks.filter(
+        (task) => task.progress > 0 && task.progress < task.target,
+      ).length,
+      done: activeTasks.filter((task) => task.progress >= task.target).length,
+      waiting: activeTasks.filter((task) => task.progress === 0).length,
+    }),
+    [activeTasks],
   );
 
   useEffect(() => {
@@ -1048,7 +1142,7 @@ export function CultivationApp() {
 
   async function copyPrompt() {
     await navigator.clipboard.writeText(AI_IMPORT_PROMPT);
-    setStatus("AI JSON 提示词已复制");
+    setStatus("配置提示词已复制");
   }
 
   if (!activeSkill || !activeStats) {
@@ -1057,38 +1151,86 @@ export function CultivationApp() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Cultivation Growth</p>
-          <h1>修炼档案</h1>
-        </div>
+      <header className="hero-grid">
+        <section className="brand-panel" aria-label="修炼档案">
+          <ScrollEmblem />
+          <div className="brand-copy">
+            <h1>修炼档案</h1>
+            <div className="brand-rule" aria-hidden="true">
+              <span />
+            </div>
+            <p>境界 · 十层 · 任务进度</p>
+          </div>
+        </section>
+
+        <section className="realm-card" aria-label="境界进度">
+          <PanelHeading title="境界" />
+          <div className="realm-orbit-list">
+            {visibleRealms.map((realm) => (
+              <button
+                key={realm.id}
+                title={`${realm.name} ${realmStats(realm).percent}%`}
+                className={`realm-orb ${
+                  activeStats.currentRealm?.id === realm.id ? "current" : ""
+                } ${selectedRealm?.id === realm.id ? "selected" : ""}`}
+                onClick={() => {
+                  setSelectedRealmId(realm.id);
+                  setSelectedLayerId(realm.layers[0]?.id ?? "");
+                  setView("practice");
+                }}
+              >
+                {realm.name}
+              </button>
+            ))}
+          </div>
+          <div className="layer-path">
+            {selectedRealm?.layers.map((layer) => {
+              const stats = layerStats(layer);
+              return (
+                <button
+                  key={layer.id}
+                  className={`path-node ${
+                    selectedLayer?.id === layer.id ? "active" : ""
+                  } ${stats.complete ? "complete" : ""}`}
+                  onClick={() => {
+                    setSelectedLayerId(layer.id);
+                    setView("practice");
+                  }}
+                >
+                  <span />
+                  <b>第{layer.number}层</b>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </header>
+
+      <section className="command-strip" aria-label="保存与导入">
         <nav className="view-tabs" aria-label="页面">
           <button
             className={view === "practice" ? "active" : ""}
             onClick={() => setView("practice")}
           >
-            修炼
+            修炼台
           </button>
           <button
             className={view === "profile" ? "active" : ""}
             onClick={() => setView("profile")}
           >
-            Profile
+            修为总览
           </button>
           <button
             className={view === "prompt" ? "active" : ""}
             onClick={() => setView("prompt")}
           >
-            AI JSON
+            配置生成
           </button>
         </nav>
-      </header>
-
-      <section className="command-strip" aria-label="保存与导入">
         <span>{status}</span>
         <div className="command-actions">
-          <button onClick={importJson}>导入 JSON</button>
-          <button onClick={exportJson}>导出 JSON</button>
+          <button onClick={importJson}>导入配置</button>
+          <button onClick={exportJson}>导出存档</button>
           <button onClick={saveToFolderNow}>
             {folderName ? "保存进度" : "选择本地文件夹"}
           </button>
@@ -1109,7 +1251,7 @@ export function CultivationApp() {
         <section className="profile-page" aria-label="技能档案">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Profile</p>
+              <p className="eyebrow">修为总览</p>
               <h2>所有技能境界</h2>
             </div>
             <strong>{state.skills.length} 个技能</strong>
@@ -1159,14 +1301,14 @@ export function CultivationApp() {
       ) : null}
 
       {view === "prompt" ? (
-        <section className="prompt-page" aria-label="AI JSON 提示词">
+        <section className="prompt-page" aria-label="配置生成提示词">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Import Prompt</p>
-              <h2>给 AI 的 JSON 生成提示词</h2>
+              <p className="eyebrow">配置生成</p>
+              <h2>生成可导入配置</h2>
             </div>
             <button className="primary-button" onClick={copyPrompt}>
-              复制提示词
+              复制配置提示词
             </button>
           </div>
           <textarea readOnly value={AI_IMPORT_PROMPT} />
@@ -1174,12 +1316,84 @@ export function CultivationApp() {
       ) : null}
 
       {view === "practice" ? (
-        <section className="workspace" aria-label="修炼面板">
+        <>
+          <section className="dashboard-panels" aria-label="修炼总览">
+            <div className="cultivation-skill-panel">
+              <PanelHeading title="修炼技能" />
+              <div className="cultivation-rows">
+                {profileStats.map(({ skill, stats }, index) => (
+                  <button
+                    key={skill.id}
+                    className={`cultivation-row ${
+                      skill.id === activeSkill.id ? "active" : ""
+                    }`}
+                    onClick={() => {
+                      setState((current) => ({
+                        ...current,
+                        activeSkillId: skill.id,
+                      }));
+                      setSelectedRealmId(stats.currentRealm?.id ?? "");
+                      setSelectedLayerId(stats.currentLayer?.id ?? "");
+                    }}
+                  >
+                    <span
+                      className={`round-seal seal-${(index % 4) + 1}`}
+                      aria-hidden="true"
+                    >
+                      {skill.name.slice(0, 1)}
+                    </span>
+                    <strong>{skill.name}</strong>
+                    <small>等级 {stats.currentLayer?.number ?? 1}</small>
+                    <ProgressBar percent={stats.percent} tone={skill.color} />
+                    <b>
+                      {stats.done} / {stats.total}
+                    </b>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="task-summary-panel">
+              <PanelHeading title="任务进度" tone="red" />
+              <div className="metric-grid">
+                <MetricCard
+                  tone="green"
+                  icon="全"
+                  label="全部任务"
+                  value={taskOverview.total}
+                  caption="总计"
+                />
+                <MetricCard
+                  tone="red"
+                  icon="进"
+                  label="进行中"
+                  value={taskOverview.doing}
+                  caption="进行中"
+                />
+                <MetricCard
+                  tone="gold"
+                  icon="成"
+                  label="已完成"
+                  value={taskOverview.done}
+                  caption="已完成"
+                />
+                <MetricCard
+                  tone="blue"
+                  icon="待"
+                  label="待推进"
+                  value={taskOverview.waiting}
+                  caption="未开始"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="workspace" aria-label="修炼面板">
           <aside className="sidebar">
             <div className="section-heading compact">
               <div>
-                <p className="eyebrow">Skills</p>
-                <h2>技能</h2>
+                <p className="eyebrow">功课簿</p>
+                <h2>技能册</h2>
               </div>
             </div>
             <div className="skill-list">
@@ -1365,7 +1579,7 @@ export function CultivationApp() {
                 <section className="route-editor" aria-label="层级选择">
                   <div className="editor-heading">
                     <div>
-                      <p className="eyebrow">Realm</p>
+                      <p className="eyebrow">境界</p>
                       <input
                         className="realm-name-input"
                         value={selectedRealm.name}
@@ -1579,7 +1793,8 @@ export function CultivationApp() {
               </div>
             ) : null}
           </section>
-        </section>
+          </section>
+        </>
       ) : null}
     </main>
   );

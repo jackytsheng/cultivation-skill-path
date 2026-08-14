@@ -39,7 +39,7 @@ test("server-renders the cultivation growth app", async () => {
   assert.match(html, /<title>修炼档案<\/title>/i);
   assert.match(html, /架子鼓/);
   assert.match(html, /当前境界/);
-  assert.match(html, /AI JSON/);
+  assert.match(html, /配置生成/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
