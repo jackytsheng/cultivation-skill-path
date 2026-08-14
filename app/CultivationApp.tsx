@@ -181,11 +181,11 @@ const PRESETS: Preset[] = [
   },
 ];
 
-const AI_IMPORT_PROMPT = `你是一个“修仙式技能成长系统”的配置助手。请根据我给你的技能目标，返回一份可以直接导入网页应用的 JSON。
+const AI_IMPORT_PROMPT = `你是一个“修仙式诸道修行系统”的配置助手。请根据我给你的修行目标，返回一份可以直接导入网页应用的 JSON。
 
 硬性要求：
 1. 只返回合法 JSON，不要 Markdown，不要解释。
-2. 每个 skill 代表一个独立技能。
+2. 每个 skill 字段代表一条独立的“道”，字段名保持 skills 以便应用导入。
 3. 每个 realm 是一个境界，用户可以用预设境界，也可以自定义、删减境界。
 4. 每个 realm 必须正好有 10 个 layers。
 5. 每个 layer 都要有 title、description、tasks。
@@ -198,7 +198,7 @@ JSON 结构：
   "skills": [
     {
       "name": "架子鼓",
-      "description": "用修炼境界管理架子鼓练习",
+      "description": "用修炼境界管理架子鼓练习这条道",
       "presetName": "绝世战神武道路线",
       "realms": [
         {
@@ -221,9 +221,9 @@ JSON 结构：
   ]
 }
 
-请现在为这个技能生成完整 JSON：
-技能名称：
-技能目标：
+请现在为这条道生成完整 JSON：
+道名：
+此道目标：
 偏好的境界路线：
 希望每层任务数量：
 每个任务的大致完成次数：`;
@@ -503,8 +503,8 @@ function normalizeSkill(value: unknown, index: number): Skill {
   const now = new Date().toISOString();
   return {
     id: readString(raw.id, uid("skill")),
-    name: readString(raw.name, `技能 ${index + 1}`),
-    description: readString(raw.description, "自定义这个技能的修炼目标。"),
+    name: readString(raw.name, `道 ${index + 1}`),
+    description: readString(raw.description, "自定义这条道的修炼目标。"),
     color: readString(raw.color, COLORS[index % COLORS.length]),
     presetName: readString(raw.presetName, preset.name),
     realms,
@@ -837,7 +837,7 @@ export function CultivationApp() {
   function addSkill() {
     const preset = PRESETS.find((item) => item.id === newSkillPreset) ?? PRESETS[0];
     const skill = makeSkillFromPreset(
-      newSkillName.trim() || `技能 ${state.skills.length + 1}`,
+      newSkillName.trim() || `道 ${state.skills.length + 1}`,
       newSkillDescription.trim() || "把长期目标拆成境界、层数和任务。",
       preset,
       uid("skill"),
@@ -859,7 +859,7 @@ export function CultivationApp() {
     if (!activeSkill || state.skills.length <= 1) {
       return;
     }
-    const confirmed = window.confirm(`删除技能“${activeSkill.name}”？`);
+    const confirmed = window.confirm(`删除此道“${activeSkill.name}”？`);
     if (!confirmed) {
       return;
     }
@@ -1098,7 +1098,7 @@ export function CultivationApp() {
         Boolean(parsed && typeof parsed === "object" && "skills" in parsed);
       const overwrite =
         isFullBackup &&
-        window.confirm("检测到完整存档。确定覆盖当前全部技能？取消则合并导入。");
+        window.confirm("检测到完整存档。确定覆盖当前全部道途？取消则合并导入。");
       updateState((current) => (overwrite ? imported : mergeImportedState(current, imported)));
       setStatus(overwrite ? "存档已覆盖导入" : "JSON 已合并导入");
       setView("profile");
@@ -1248,13 +1248,13 @@ export function CultivationApp() {
       </section>
 
       {view === "profile" ? (
-        <section className="profile-page" aria-label="技能档案">
+        <section className="profile-page" aria-label="诸道档案">
           <div className="section-heading">
             <div>
               <p className="eyebrow">修为总览</p>
-              <h2>所有技能境界</h2>
+              <h2>诸道境界</h2>
             </div>
-            <strong>{state.skills.length} 个技能</strong>
+            <strong>{state.skills.length} 条道</strong>
           </div>
           <div className="profile-grid">
             {profileStats.map(({ skill, stats }) => (
@@ -1319,7 +1319,7 @@ export function CultivationApp() {
         <>
           <section className="dashboard-panels" aria-label="修炼总览">
             <div className="cultivation-skill-panel">
-              <PanelHeading title="修炼技能" />
+              <PanelHeading title="诸道修行" />
               <div className="cultivation-rows">
                 {profileStats.map(({ skill, stats }, index) => (
                   <button
@@ -1393,7 +1393,7 @@ export function CultivationApp() {
             <div className="section-heading compact">
               <div>
                 <p className="eyebrow">功课簿</p>
-                <h2>技能册</h2>
+                <h2>道册</h2>
               </div>
             </div>
             <div className="skill-list">
@@ -1431,11 +1431,11 @@ export function CultivationApp() {
 
             <div className="new-skill">
               <label>
-                新技能
+                新开一道
                 <input
                   value={newSkillName}
                   onChange={(event) => setNewSkillName(event.target.value)}
-                  placeholder="比如 英语口语"
+                  placeholder="比如 鼓道、剑道、英语口语"
                 />
               </label>
               <label>
@@ -1445,7 +1445,7 @@ export function CultivationApp() {
                   onChange={(event) =>
                     setNewSkillDescription(event.target.value)
                   }
-                  placeholder="这个技能要修到什么程度"
+                  placeholder="此道要修到什么程度"
                 />
               </label>
               <label>
@@ -1462,7 +1462,7 @@ export function CultivationApp() {
                 </select>
               </label>
               <button className="primary-button" onClick={addSkill}>
-                新建技能
+                开辟此道
               </button>
             </div>
           </aside>
@@ -1476,7 +1476,7 @@ export function CultivationApp() {
                   aria-hidden="true"
                 />
                 <label>
-                  技能名称
+                  道名
                   <input
                     value={activeSkill.name}
                     onChange={(event) =>
@@ -1489,7 +1489,7 @@ export function CultivationApp() {
                 </label>
               </div>
               <label className="skill-description">
-                技能目标
+                此道目标
                 <textarea
                   value={activeSkill.description}
                   onChange={(event) =>
@@ -1505,7 +1505,7 @@ export function CultivationApp() {
                 onClick={deleteActiveSkill}
                 disabled={state.skills.length <= 1}
               >
-                删除技能
+                删除此道
               </button>
             </div>
 
