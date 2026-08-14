@@ -53,6 +53,7 @@ type Preset = {
   id: string;
   name: string;
   realms: string[];
+  selectable?: boolean;
 };
 
 type TaskStats = {
@@ -122,6 +123,7 @@ const HANDLE_KEY = "progress-directory";
 const PROGRESS_FILE_NAME = "cultivation-progress.json";
 const DEFAULT_TIMESTAMP = "2026-08-14T00:00:00.000Z";
 const COLORS = ["#2f7d5c", "#a04d3f", "#8b6f24", "#4e6b8f", "#7b5c8f"];
+const LAYERS_PER_REALM = 10;
 
 const PRESETS: Preset[] = [
   {
@@ -157,11 +159,21 @@ const PRESETS: Preset[] = [
       "武祖境",
       "武帝境",
       "武神境",
+      "人神",
+      "地神",
+      "天神",
+      "人仙",
+      "地仙",
+      "天仙",
+      "主宰",
+      "天尊",
+      "无上天尊",
     ],
   },
   {
     id: "shenxian",
     name: "神位仙阶路线",
+    selectable: false,
     realms: [
       "人神",
       "地神",
@@ -180,6 +192,16 @@ const PRESETS: Preset[] = [
     realms: ["入门", "熟练", "精通", "化境", "宗师"],
   },
 ];
+
+const SELECTABLE_PRESETS = PRESETS.filter((preset) => preset.selectable !== false);
+
+function presetLayerCount(preset: Preset) {
+  return preset.realms.length * LAYERS_PER_REALM;
+}
+
+function presetOptionLabel(preset: Preset) {
+  return `${preset.name}（共${presetLayerCount(preset)}层）`;
+}
 
 const AI_IMPORT_PROMPT = `你是一个“修仙式诸道修行系统”的配置助手。请根据我给你的修行目标，返回一份可以直接导入网页应用的 JSON。
 
@@ -267,7 +289,7 @@ function makeRealm(
     id: realmId,
     name: custom?.name ?? realmName,
     summary: custom?.summary ?? "自定义这个境界的核心主题。",
-    layers: Array.from({ length: 10 }, (_, layerIndex) =>
+    layers: Array.from({ length: LAYERS_PER_REALM }, (_, layerIndex) =>
       makeLayer(`${realmId}`, custom?.name ?? realmName, layerIndex, rawLayers[layerIndex]),
     ),
   };
@@ -482,7 +504,7 @@ function normalizeRealm(value: unknown, index: number): Realm {
     id: readString(raw.id, uid("realm")),
     name,
     summary: readString(raw.summary, "自定义这个境界的核心主题。"),
-    layers: Array.from({ length: 10 }, (_, layerIndex) =>
+    layers: Array.from({ length: LAYERS_PER_REALM }, (_, layerIndex) =>
       normalizeLayer(rawLayers[layerIndex], layerIndex, name),
     ),
   };
@@ -697,7 +719,9 @@ export function CultivationApp() {
   const [view, setView] = useState<"practice" | "profile" | "prompt">("practice");
   const [newSkillName, setNewSkillName] = useState("");
   const [newSkillDescription, setNewSkillDescription] = useState("");
-  const [newSkillPreset, setNewSkillPreset] = useState(PRESETS[0].id);
+  const [newSkillPreset, setNewSkillPreset] = useState(
+    SELECTABLE_PRESETS[0]?.id ?? PRESETS[0].id,
+  );
   const [selectedRealmId, setSelectedRealmId] = useState("");
   const [selectedLayerId, setSelectedLayerId] = useState("");
   const [newRealmName, setNewRealmName] = useState("");
@@ -828,7 +852,10 @@ export function CultivationApp() {
   }
 
   function addSkill() {
-    const preset = PRESETS.find((item) => item.id === newSkillPreset) ?? PRESETS[0];
+    const preset =
+      SELECTABLE_PRESETS.find((item) => item.id === newSkillPreset) ??
+      SELECTABLE_PRESETS[0] ??
+      PRESETS[0];
     const skill = makeSkillFromPreset(
       newSkillName.trim() || `道 ${state.skills.length + 1}`,
       newSkillDescription.trim() || "把长期目标拆成境界、层数和任务。",
@@ -1451,9 +1478,9 @@ export function CultivationApp() {
                   value={newSkillPreset}
                   onChange={(event) => setNewSkillPreset(event.target.value)}
                 >
-                  {PRESETS.map((preset) => (
+                  {SELECTABLE_PRESETS.map((preset) => (
                     <option key={preset.id} value={preset.id}>
-                      {preset.name}
+                      {presetOptionLabel(preset)}
                     </option>
                   ))}
                 </select>
