@@ -1226,9 +1226,13 @@ export function CultivationApp() {
         </nav>
         <span>{status}</span>
         <div className="command-actions">
-          <button onClick={importJson}>导入配置</button>
-          <button onClick={exportJson}>导出存档</button>
-          <button onClick={saveToFolderNow}>
+          <button className="command-button import-command" onClick={importJson}>
+            导入配置
+          </button>
+          <button className="command-button export-command" onClick={exportJson}>
+            导出存档
+          </button>
+          <button className="command-button save-command" onClick={saveToFolderNow}>
             {folderName ? "保存进度" : "选择本地文件夹"}
           </button>
         </div>
