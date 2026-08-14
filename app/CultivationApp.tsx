@@ -663,11 +663,7 @@ function PanelHeading({ title, tone = "green" }: { title: string; tone?: string 
 }
 
 function ScrollEmblem() {
-  return (
-    <div className="scroll-emblem" aria-hidden="true">
-      <div className="scroll-art" />
-    </div>
-  );
+  return <div className="scroll-emblem" aria-hidden="true" />;
 }
 
 function MetricCard({
