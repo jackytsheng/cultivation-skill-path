@@ -706,10 +706,24 @@ h3 {
 }
 
 .scroll-emblem {
-  width: 126px;
-  height: 196px;
-  background: url("/scroll-emblem.jpg") center / contain no-repeat;
-  filter: drop-shadow(0 14px 16px rgba(66, 49, 21, 0.16));
+  position: relative;
+  width: 112px;
+  height: 184px;
+  border: 2px solid rgba(193, 151, 71, 0.86);
+  border-radius: 18px 18px 8px 8px;
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 225, 0.48),
+    0 10px 16px rgba(72, 54, 24, 0.08);
+}
+
+.scroll-emblem::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(193, 151, 71, 0.72);
+  border-radius: 13px 13px 5px 5px;
+  pointer-events: none;
 }
 
 .realm-card {
@@ -1246,8 +1260,8 @@ h3 {
   }
 
   .scroll-emblem {
-    width: 76px;
-    height: 120px;
+    width: 70px;
+    height: 118px;
   }
 
   .realm-card {
