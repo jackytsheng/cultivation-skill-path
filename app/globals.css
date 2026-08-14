@@ -429,6 +429,15 @@ h3 {
   color: var(--gold);
 }
 
+.realm-pill.locked,
+.layer-button.locked {
+  opacity: 0.54;
+}
+
+.realm-pill.locked {
+  background: rgba(246, 241, 229, 0.5);
+}
+
 .editor-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.18fr);
@@ -487,6 +496,10 @@ h3 {
   color: var(--green);
 }
 
+.layer-button.locked b {
+  color: #a69b89;
+}
+
 .jump-button,
 .add-task-button {
   width: 100%;
@@ -497,6 +510,17 @@ h3 {
 .task-list {
   display: grid;
   gap: 10px;
+}
+
+.sequence-lock {
+  border: 1px solid rgba(190, 147, 55, 0.4);
+  border-left: 4px solid #bd9232;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 248, 230, 0.76);
+  color: #7c5d1f;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .task-row {
@@ -813,6 +837,12 @@ h3 {
   outline-offset: 3px;
 }
 
+.realm-orb.locked {
+  opacity: 0.52;
+  background: #e3dfd2;
+  color: #8c8475;
+}
+
 .layer-path {
   --path-node-y: 12px;
   --path-gap-total: 36px;
@@ -866,6 +896,15 @@ h3 {
 .path-node.active span {
   background: #fffdf6;
   box-shadow: 0 0 0 4px rgba(201, 157, 67, 0.18);
+}
+
+.path-node.locked {
+  color: #9c9280;
+}
+
+.path-node.locked span {
+  border-color: #cfc5b3;
+  background: #ddd4c4;
 }
 
 .path-node b {

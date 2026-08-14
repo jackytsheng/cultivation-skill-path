@@ -432,6 +432,46 @@ function skillStats(skill: Skill): SkillStats {
   };
 }
 
+function orderedLayerEntries(skill: Skill) {
+  return skill.realms.flatMap((realm, realmIndex) =>
+    realm.layers.map((layer, layerIndex) => ({
+      realm,
+      layer,
+      index: realmIndex * LAYERS_PER_REALM + layerIndex,
+    })),
+  );
+}
+
+function firstIncompleteLayerEntry(skill: Skill) {
+  return orderedLayerEntries(skill).find((entry) => !layerStats(entry.layer).complete);
+}
+
+function layerOrderIndex(skill: Skill, realmId: string, layerId: string) {
+  return orderedLayerEntries(skill).find(
+    (entry) => entry.realm.id === realmId && entry.layer.id === layerId,
+  )?.index;
+}
+
+function canAdvanceLayer(skill: Skill, realmId: string, layerId: string) {
+  const selectedIndex = layerOrderIndex(skill, realmId, layerId);
+  if (selectedIndex === undefined) {
+    return false;
+  }
+  const current = firstIncompleteLayerEntry(skill);
+  return !current || selectedIndex <= current.index;
+}
+
+function canAdvanceRealm(skill: Skill, realmId: string) {
+  const realm = skill.realms.find((item) => item.id === realmId);
+  const firstLayer = realm?.layers[0];
+  return firstLayer ? canAdvanceLayer(skill, realmId, firstLayer.id) : false;
+}
+
+function currentGateLabel(skill: Skill) {
+  const current = firstIncompleteLayerEntry(skill);
+  return current ? `${current.realm.name} · 第${current.layer.number}层` : "";
+}
+
 function realmStats(realm: Realm): TaskStats {
   const stats = realm.layers.map(layerStats);
   const total = stats.reduce((sum, item) => sum + item.total, 0);
@@ -745,6 +785,11 @@ export function CultivationApp() {
     activeStats?.currentLayer ??
     selectedRealm?.layers[0];
   const selectedLayerStats = selectedLayer ? layerStats(selectedLayer) : undefined;
+  const selectedLayerUnlocked =
+    activeSkill && selectedRealm && selectedLayer
+      ? canAdvanceLayer(activeSkill, selectedRealm.id, selectedLayer.id)
+      : false;
+  const gateLabel = activeSkill ? currentGateLabel(activeSkill) : "";
 
   const profileStats = useMemo(
     () => state.skills.map((skill) => ({ skill, stats: skillStats(skill) })),
@@ -956,6 +1001,11 @@ export function CultivationApp() {
     taskId: string,
     patch: Partial<Task>,
   ) {
+    const changesProgress = Object.prototype.hasOwnProperty.call(patch, "progress");
+    if (changesProgress && activeSkill && !canAdvanceLayer(activeSkill, realmId, layerId)) {
+      setStatus(`先完成 ${currentGateLabel(activeSkill)}，再推进后续层级`);
+      return;
+    }
     updateActiveSkill((skill) => ({
       ...skill,
       realms: skill.realms.map((realm) =>
@@ -1186,32 +1236,45 @@ export function CultivationApp() {
         <section className="realm-card" aria-label="境界进度">
           <PanelHeading title="境界" />
           <div className="realm-orbit-list">
-            {visibleRealms.map((realm) => (
-              <button
-                key={realm.id}
-                title={`${realm.name} ${realmStats(realm).percent}%`}
-                className={`realm-orb ${
-                  activeStats.currentRealm?.id === realm.id ? "current" : ""
-                } ${selectedRealm?.id === realm.id ? "selected" : ""}`}
-                onClick={() => {
-                  setSelectedRealmId(realm.id);
-                  setSelectedLayerId(realm.layers[0]?.id ?? "");
-                  setView("practice");
-                }}
-              >
-                {realm.name}
-              </button>
-            ))}
+            {visibleRealms.map((realm) => {
+              const unlocked = canAdvanceRealm(activeSkill, realm.id);
+              return (
+                <button
+                  key={realm.id}
+                  title={
+                    unlocked
+                      ? `${realm.name} ${realmStats(realm).percent}%`
+                      : `未解锁：先完成 ${gateLabel}`
+                  }
+                  className={`realm-orb ${
+                    activeStats.currentRealm?.id === realm.id ? "current" : ""
+                  } ${selectedRealm?.id === realm.id ? "selected" : ""} ${
+                    unlocked ? "" : "locked"
+                  }`}
+                  onClick={() => {
+                    setSelectedRealmId(realm.id);
+                    setSelectedLayerId(realm.layers[0]?.id ?? "");
+                    setView("practice");
+                  }}
+                >
+                  {realm.name}
+                </button>
+              );
+            })}
           </div>
           <div className="layer-path">
             {selectedRealm?.layers.map((layer) => {
               const stats = layerStats(layer);
+              const unlocked = canAdvanceLayer(activeSkill, selectedRealm.id, layer.id);
               return (
                 <button
                   key={layer.id}
                   className={`path-node ${
                     selectedLayer?.id === layer.id ? "active" : ""
-                  } ${stats.complete ? "complete" : ""}`}
+                  } ${stats.complete ? "complete" : ""} ${
+                    unlocked ? "" : "locked"
+                  }`}
+                  title={unlocked ? `第${layer.number}层` : `未解锁：先完成 ${gateLabel}`}
                   onClick={() => {
                     setSelectedLayerId(layer.id);
                     setView("practice");
@@ -1579,12 +1642,14 @@ export function CultivationApp() {
                     realmLayers.reduce((sum, item) => sum + item.percent, 0) /
                       Math.max(1, realmLayers.length),
                   );
+                  const unlocked = canAdvanceRealm(activeSkill, realm.id);
                   return (
                     <button
                       key={realm.id}
                       className={`realm-pill ${
                         selectedRealm?.id === realm.id ? "active" : ""
-                      }`}
+                      } ${unlocked ? "" : "locked"}`}
+                      title={unlocked ? realm.name : `未解锁：先完成 ${gateLabel}`}
                       onClick={() => {
                         setSelectedRealmId(realm.id);
                         setSelectedLayerId(realm.layers[0]?.id ?? "");
@@ -1634,12 +1699,22 @@ export function CultivationApp() {
                   <div className="layer-grid">
                     {selectedRealm.layers.map((layer) => {
                       const stats = layerStats(layer);
+                      const unlocked = canAdvanceLayer(
+                        activeSkill,
+                        selectedRealm.id,
+                        layer.id,
+                      );
                       return (
                         <button
                           key={layer.id}
                           className={`layer-button ${
                             selectedLayer.id === layer.id ? "active" : ""
-                          } ${stats.complete ? "complete" : ""}`}
+                          } ${stats.complete ? "complete" : ""} ${
+                            unlocked ? "" : "locked"
+                          }`}
+                          title={
+                            unlocked ? `第${layer.number}层` : `未解锁：先完成 ${gateLabel}`
+                          }
                           onClick={() => setSelectedLayerId(layer.id)}
                         >
                           <span>第{layer.number}层</span>
@@ -1690,6 +1765,11 @@ export function CultivationApp() {
                       })
                     }
                   />
+                  {!selectedLayerUnlocked ? (
+                    <div className="sequence-lock" role="status">
+                      先完成 {gateLabel}，再推进此层任务。
+                    </div>
+                  ) : null}
                   <div className="task-list">
                     {selectedLayer.tasks.map((task) => {
                       const taskPercent = Math.round(
@@ -1737,6 +1817,7 @@ export function CultivationApp() {
                                   min={0}
                                   max={task.target}
                                   value={task.progress}
+                                  disabled={!selectedLayerUnlocked}
                                   onChange={(event) =>
                                     updateTask(
                                       selectedRealm.id,
@@ -1763,6 +1844,7 @@ export function CultivationApp() {
                           <div className="task-actions">
                             <button
                               aria-label={`减少 ${task.title}`}
+                              disabled={!selectedLayerUnlocked}
                               onClick={() =>
                                 updateTask(
                                   selectedRealm.id,
@@ -1777,6 +1859,7 @@ export function CultivationApp() {
                             <button
                               className="primary-button square"
                               aria-label={`推进 ${task.title}`}
+                              disabled={!selectedLayerUnlocked}
                               onClick={() =>
                                 updateTask(
                                   selectedRealm.id,
