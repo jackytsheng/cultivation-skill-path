@@ -928,14 +928,19 @@ h3 {
 
 .command-button::after {
   position: absolute;
-  left: 16px;
+  left: 10px;
   top: 50%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   transform: translateY(-50%);
   color: #fffdf6;
   font-family: var(--font-scroll);
   font-size: 14px;
   font-weight: 900;
   line-height: 1;
+  text-align: center;
 }
 
 .command-button:hover {
