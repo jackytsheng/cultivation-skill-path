@@ -1229,7 +1229,10 @@ export function CultivationApp() {
             <div className="brand-rule" aria-hidden="true">
               <span />
             </div>
-            <p>境界 · 十层 · 任务进度</p>
+            <p className="brand-subtitle">
+              {activeSkill.name} <span>·</span> 修炼功法
+            </p>
+            <p className="brand-meta">境界 · 十层 · 任务进度</p>
           </div>
         </section>
 
@@ -1343,6 +1346,83 @@ export function CultivationApp() {
             </div>
             <strong>{state.skills.length} 条道</strong>
           </div>
+          <div className="overview-management">
+            <div className="cultivation-skill-panel">
+              <PanelHeading title="诸道修行" />
+              <div className="cultivation-rows">
+                {profileStats.map(({ skill, stats }, index) => (
+                  <button
+                    key={skill.id}
+                    className={`cultivation-row ${
+                      skill.id === activeSkill.id ? "active" : ""
+                    }`}
+                    onClick={() => {
+                      setState((current) => ({
+                        ...current,
+                        activeSkillId: skill.id,
+                      }));
+                      setSelectedRealmId(stats.currentRealm?.id ?? "");
+                      setSelectedLayerId(stats.currentLayer?.id ?? "");
+                      setView("practice");
+                    }}
+                  >
+                    <span
+                      className={`round-seal seal-${(index % 4) + 1}`}
+                      aria-hidden="true"
+                    >
+                      {skill.name.slice(0, 1)}
+                    </span>
+                    <strong>{skill.name}</strong>
+                    <small>等级 {stats.currentLayer?.number ?? 1}</small>
+                    <ProgressBar percent={stats.percent} tone={skill.color} />
+                    <b>
+                      {stats.done} / {stats.total}
+                    </b>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="overview-create-panel">
+              <PanelHeading title="开辟此道" tone="gold" />
+              <div className="new-skill">
+                <label>
+                  新开一道
+                  <input
+                    value={newSkillName}
+                    onChange={(event) => setNewSkillName(event.target.value)}
+                    placeholder="比如 鼓道、剑道、英语口语"
+                  />
+                </label>
+                <label>
+                  目标
+                  <textarea
+                    value={newSkillDescription}
+                    onChange={(event) =>
+                      setNewSkillDescription(event.target.value)
+                    }
+                    placeholder="此道要修到什么程度"
+                  />
+                </label>
+                <label>
+                  预设路线
+                  <select
+                    value={newSkillPreset}
+                    onChange={(event) => setNewSkillPreset(event.target.value)}
+                  >
+                    {SELECTABLE_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {presetOptionLabel(preset)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="primary-button" onClick={addSkill}>
+                  开辟此道
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="profile-grid">
             {profileStats.map(({ skill, stats }) => (
               <button
@@ -1404,42 +1484,7 @@ export function CultivationApp() {
 
       {view === "practice" ? (
         <>
-          <section className="dashboard-panels" aria-label="修炼总览">
-            <div className="cultivation-skill-panel">
-              <PanelHeading title="诸道修行" />
-              <div className="cultivation-rows">
-                {profileStats.map(({ skill, stats }, index) => (
-                  <button
-                    key={skill.id}
-                    className={`cultivation-row ${
-                      skill.id === activeSkill.id ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setState((current) => ({
-                        ...current,
-                        activeSkillId: skill.id,
-                      }));
-                      setSelectedRealmId(stats.currentRealm?.id ?? "");
-                      setSelectedLayerId(stats.currentLayer?.id ?? "");
-                    }}
-                  >
-                    <span
-                      className={`round-seal seal-${(index % 4) + 1}`}
-                      aria-hidden="true"
-                    >
-                      {skill.name.slice(0, 1)}
-                    </span>
-                    <strong>{skill.name}</strong>
-                    <small>等级 {stats.currentLayer?.number ?? 1}</small>
-                    <ProgressBar percent={stats.percent} tone={skill.color} />
-                    <b>
-                      {stats.done} / {stats.total}
-                    </b>
-                  </button>
-                ))}
-              </div>
-            </div>
-
+          <section className="dashboard-panels practice-dashboard" aria-label="当前道任务总览">
             <div className="task-summary-panel">
               <PanelHeading title="任务进度" tone="red" />
               <div className="metric-grid">
@@ -1475,85 +1520,7 @@ export function CultivationApp() {
             </div>
           </section>
 
-          <section className="workspace" aria-label="修炼面板">
-          <aside className="sidebar">
-            <div className="section-heading compact">
-              <div>
-                <p className="eyebrow">功课簿</p>
-                <h2>道册</h2>
-              </div>
-            </div>
-            <div className="skill-list">
-              {profileStats.map(({ skill, stats }) => (
-                <button
-                  key={skill.id}
-                  className={`skill-row ${
-                    skill.id === activeSkill.id ? "active" : ""
-                  }`}
-                  onClick={() => {
-                    setState((current) => ({
-                      ...current,
-                      activeSkillId: skill.id,
-                    }));
-                    setSelectedRealmId(stats.currentRealm?.id ?? "");
-                    setSelectedLayerId(stats.currentLayer?.id ?? "");
-                  }}
-                >
-                  <span
-                    className="skill-mark"
-                    style={{ background: skill.color }}
-                    aria-hidden="true"
-                  />
-                  <span>
-                    <strong>{skill.name}</strong>
-                    <small>
-                      {stats.currentRealm?.name ?? "未设境界"} · 第
-                      {stats.currentLayer?.number ?? 1} 层
-                    </small>
-                  </span>
-                  <b>{stats.percent}%</b>
-                </button>
-              ))}
-            </div>
-
-            <div className="new-skill">
-              <label>
-                新开一道
-                <input
-                  value={newSkillName}
-                  onChange={(event) => setNewSkillName(event.target.value)}
-                  placeholder="比如 鼓道、剑道、英语口语"
-                />
-              </label>
-              <label>
-                目标
-                <textarea
-                  value={newSkillDescription}
-                  onChange={(event) =>
-                    setNewSkillDescription(event.target.value)
-                  }
-                  placeholder="此道要修到什么程度"
-                />
-              </label>
-              <label>
-                预设路线
-                <select
-                  value={newSkillPreset}
-                  onChange={(event) => setNewSkillPreset(event.target.value)}
-                >
-                  {SELECTABLE_PRESETS.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {presetOptionLabel(preset)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="primary-button" onClick={addSkill}>
-                开辟此道
-              </button>
-            </div>
-          </aside>
-
+          <section className="workspace practice-workspace" aria-label="修炼面板">
           <section className="practice-main">
             <div className="skill-header">
               <div className="skill-title-block">
