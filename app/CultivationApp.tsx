@@ -665,10 +665,7 @@ function PanelHeading({ title, tone = "green" }: { title: string; tone?: string 
 function ScrollEmblem() {
   return (
     <div className="scroll-emblem" aria-hidden="true">
-      <div className="scroll-sun" />
-      <div className="scroll-mountain back" />
-      <div className="scroll-mountain front" />
-      <div className="scroll-cloud" />
+      <div className="scroll-art" />
     </div>
   );
 }
