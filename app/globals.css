@@ -1225,7 +1225,6 @@ h3 {
 .realm-card,
 .cultivation-skill-panel,
 .overview-create-panel,
-.overview-import-panel,
 .task-summary-panel {
   border: 1px solid rgba(199, 186, 157, 0.78);
   border-radius: 10px;
@@ -1697,7 +1696,7 @@ h3 {
 
 .overview-management {
   display: grid;
-  grid-template-columns: minmax(420px, 1.1fr) minmax(300px, 0.85fr) minmax(340px, 0.95fr);
+  grid-template-columns: minmax(540px, 1fr) minmax(360px, 0.74fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -1712,7 +1711,6 @@ h3 {
 
 .cultivation-skill-panel,
 .overview-create-panel,
-.overview-import-panel,
 .task-summary-panel {
   display: grid;
   gap: 14px;
@@ -1726,9 +1724,32 @@ h3 {
 }
 
 .overview-create-panel .new-skill,
-.overview-import-panel .dao-import {
+.overview-create-panel .dao-import {
   border-top: 0;
   padding-top: 0;
+}
+
+.creation-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.creation-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(217, 203, 176, 0.72);
+}
+
+.creation-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.creation-section h3 {
+  color: #4f432e;
+  font-family: var(--font-scroll);
+  font-size: 17px;
 }
 
 .dao-import {
@@ -1771,7 +1792,7 @@ h3 {
 
 .cultivation-row {
   display: grid;
-  grid-template-columns: 48px minmax(110px, 0.9fr) 64px minmax(120px, 1fr) 90px;
+  grid-template-columns: 48px minmax(92px, 0.72fr) minmax(58px, auto) minmax(104px, 1fr) minmax(118px, max-content);
   gap: 12px;
   align-items: center;
   min-height: 58px;
@@ -1806,9 +1827,14 @@ h3 {
 }
 
 .cultivation-row b {
+  justify-self: end;
+  max-width: 100%;
   color: #4a785c;
-  font-size: 15px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
   text-align: right;
+  white-space: nowrap;
 }
 
 .cultivation-pager {
@@ -1972,7 +1998,6 @@ h3 {
 .profile-page,
 .prompt-page,
 .overview-create-panel,
-.overview-import-panel,
 .route-editor,
 .layer-editor {
   box-shadow: var(--paper-shadow);

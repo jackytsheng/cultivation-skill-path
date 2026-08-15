@@ -449,6 +449,16 @@ function clampProgress(value: number, target: number) {
   return Math.min(max, Math.max(0, Math.floor(value || 0)));
 }
 
+function compactCount(value: number) {
+  const count = Math.max(0, Math.floor(value || 0));
+  if (count < 10000) {
+    return String(count);
+  }
+  const wan = count / 10000;
+  const digits = wan >= 10 ? 0 : 1;
+  return `${wan.toFixed(digits).replace(/\.0$/, "")}万`;
+}
+
 function layerStats(layer: Layer): TaskStats {
   const totals = layer.tasks.reduce(
     (acc, task) => {
@@ -2016,8 +2026,8 @@ export function CultivationApp() {
                     <strong>{skill.name}</strong>
                     <small>等级 {stats.currentLayer?.number ?? 1}</small>
                     <ProgressBar percent={stats.percent} tone={skill.color} />
-                    <b>
-                      {stats.done} / {stats.total}
+                    <b title={`${stats.done} / ${stats.total}`}>
+                      {compactCount(stats.done)}/{compactCount(stats.total)}
                     </b>
                   </button>
                 ))}
@@ -2045,66 +2055,71 @@ export function CultivationApp() {
 
             <div className="overview-create-panel">
               <PanelHeading title="开辟新道" tone="gold" />
-              <div className="new-skill">
-                <label>
-                  新开一道
-                  <input
-                    value={newSkillName}
-                    onChange={(event) => setNewSkillName(event.target.value)}
-                    placeholder="比如 鼓道、剑道、英语口语"
-                  />
-                </label>
-                <label>
-                  目标
-                  <textarea
-                    value={newSkillDescription}
-                    onChange={(event) =>
-                      setNewSkillDescription(event.target.value)
-                    }
-                    placeholder="此道要修到什么程度"
-                  />
-                </label>
-                <label>
-                  预设路线
-                  <select
-                    value={newSkillPreset}
-                    onChange={(event) => setNewSkillPreset(event.target.value)}
-                  >
-                    {SELECTABLE_PRESETS.map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {presetOptionLabel(preset)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button className="primary-button" onClick={addSkill}>
-                  开辟新道
-                </button>
-              </div>
-            </div>
+              <div className="creation-sections">
+                <section className="creation-section" aria-label="手动开辟">
+                  <h3>手动开辟</h3>
+                  <div className="new-skill">
+                    <label>
+                      新开一道
+                      <input
+                        value={newSkillName}
+                        onChange={(event) => setNewSkillName(event.target.value)}
+                        placeholder="比如 鼓道、剑道、英语口语"
+                      />
+                    </label>
+                    <label>
+                      目标
+                      <textarea
+                        value={newSkillDescription}
+                        onChange={(event) =>
+                          setNewSkillDescription(event.target.value)
+                        }
+                        placeholder="此道要修到什么程度"
+                      />
+                    </label>
+                    <label>
+                      预设路线
+                      <select
+                        value={newSkillPreset}
+                        onChange={(event) => setNewSkillPreset(event.target.value)}
+                      >
+                        {SELECTABLE_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {presetOptionLabel(preset)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="primary-button" onClick={addSkill}>
+                      开辟新道
+                    </button>
+                  </div>
+                </section>
 
-            <div className="overview-import-panel">
-              <PanelHeading title="道法导入" tone="red" />
-              <div className="dao-import">
-                <label>
-                  境界路线
-                  <select
-                    value={daoImportPreset}
-                    onChange={(event) => setDaoImportPreset(event.target.value)}
-                  >
-                    {SELECTABLE_PRESETS.map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {presetOptionLabel(preset)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button className="jump-button" onClick={copyPrompt}>
-                  刻录道法引
-                </button>
-                <button className="primary-button" onClick={selectDaoSchemaFile}>
-                  选择道法秘籍
-                </button>
+                <section className="creation-section" aria-label="道法秘籍">
+                  <h3>道法秘籍</h3>
+                  <div className="dao-import">
+                    <label>
+                      境界路线
+                      <select
+                        value={daoImportPreset}
+                        onChange={(event) => setDaoImportPreset(event.target.value)}
+                      >
+                        {SELECTABLE_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {presetOptionLabel(preset)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="jump-button" onClick={copyPrompt}>
+                      刻录道法引
+                    </button>
+                    <button className="primary-button" onClick={selectDaoSchemaFile}>
+                      选择道法秘籍
+                    </button>
+                  </div>
+                </section>
               </div>
             </div>
           </div>
@@ -2173,7 +2188,7 @@ export function CultivationApp() {
       ) : null}
 
       {view === "prompt" ? (
-        <section className="prompt-page" aria-label="道册与道法导入">
+        <section className="prompt-page" aria-label="道册与道法秘籍">
           <div className="section-heading">
             <div>
               <p className="eyebrow">道册</p>
@@ -2221,15 +2236,15 @@ export function CultivationApp() {
             </section>
 
             <section className="guide-section">
-              <h3>道法导入怎么用</h3>
+              <h3>道法秘籍怎么用</h3>
               <p>
-                先在“道法导入”里选境界路线，再用“刻录”复制本页“道法引”发给 AI。
+                先在“开辟新道”的“道法秘籍”里选境界路线，再用“刻录”复制本页“道法引”发给 AI。
                 AI 会先让你填写“我想学”和“我眼中的顶级状态”。
                 你填完后，剩下的境界、十层、每层任务都交给道法引和 AI agent 推演。
               </p>
               <p>
                 道法引会要求 AI 生成可下载的 .json 秘籍文件；下载后点“选择道法秘籍”即可导入。
-                道法导入不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
+                道法秘籍不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
                 完整 source of truth 仍然用顶部的“导入存档”恢复。
               </p>
             </section>
