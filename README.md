@@ -270,7 +270,7 @@ cultivation-progress.json
 - 每层标题、说明和任务
 
 道法 JSON 不要包含完整存档字段，例如 `version`、`skills`、`storage`、`activity`、`id`、`createdAt`、`updatedAt`。
-道法秘籍也不需要包含 `color`。应用会在导入时按当前顺序自动分配主题色：绿、红、金、蓝、紫循环。
+道法秘籍也不需要包含 `color`。应用会在导入时自行决定此道的主题颜色。
 
 道法秘籍只接受文件：
 

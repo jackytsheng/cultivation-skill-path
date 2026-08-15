@@ -271,7 +271,7 @@ function daoSchemaPrompt(preset: Preset) {
 2. JSON 顶层必须只有 name、description、realms 这些导入字段。
 3. 当前选择的预设路线是：${preset.name}（共${preset.realms.length}境界）。
 4. 网页导入时会按这个预设路线给境界命名：${preset.realms.join(" → ")}。
-5. 不要输出 color；网页会在导入时按当前第几条道自动分配主题色，顺序是绿、红、金、蓝、紫循环。
+5. 不要输出 color；网页系统会在导入时自行决定此道的主题颜色。
 6. 你不需要输出 realm.name；每个 realm 只写 summary 和 layers。
 7. 如果用户没有指定境界数量，请你根据这项能力的学习跨度、复杂度和顶级状态自行决定 realms 数量；常见可以是 5 到 13 个境界，但不要机械套用预设数量。
 8. 如果你返回的 realms 少于预设数量，网页只导入你返回的境界，后面多余境界会去掉。
