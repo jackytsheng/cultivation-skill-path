@@ -268,22 +268,22 @@ function daoSchemaPrompt(preset: Preset) {
 
 生成 JSON 时的导入规则：
 1. 这是单条“道法 JSON”，不是完整存档；不要输出 version、skills、storage、activity、id、createdAt、updatedAt。
-2. JSON 顶层必须只有 name、description、color、realms 这些导入字段。
+2. JSON 顶层必须只有 name、description、realms 这些导入字段。
 3. 当前选择的预设路线是：${preset.name}（共${preset.realms.length}境界）。
 4. 网页导入时会按这个预设路线给境界命名：${preset.realms.join(" → ")}。
-5. 你不需要输出 realm.name；每个 realm 只写 summary 和 layers。
-6. 如果用户没有指定境界数量，请你根据这项能力的学习跨度、复杂度和顶级状态自行决定 realms 数量；常见可以是 5 到 13 个境界，但不要机械套用预设数量。
-7. 如果你返回的 realms 少于预设数量，网页只导入你返回的境界，后面多余境界会去掉。
-8. 如果你返回的 realms 多于预设数量，网页会把多出来的境界自动命名为“境界${preset.realms.length + 1}”“境界${preset.realms.length + 2}”等。
-9. 每个 realm 必须有 summary 和正好 10 个 layers。
-10. 每个 layer 必须有 title、description、tasks。
-11. 每个 task 必须有 title、target、progress。
+5. 不要输出 color；网页会在导入时按当前第几条道自动分配主题色，顺序是绿、红、金、蓝、紫循环。
+6. 你不需要输出 realm.name；每个 realm 只写 summary 和 layers。
+7. 如果用户没有指定境界数量，请你根据这项能力的学习跨度、复杂度和顶级状态自行决定 realms 数量；常见可以是 5 到 13 个境界，但不要机械套用预设数量。
+8. 如果你返回的 realms 少于预设数量，网页只导入你返回的境界，后面多余境界会去掉。
+9. 如果你返回的 realms 多于预设数量，网页会把多出来的境界自动命名为“境界${preset.realms.length + 1}”“境界${preset.realms.length + 2}”等。
+10. 每个 realm 必须有 summary 和正好 10 个 layers。
+11. 每个 layer 必须有 title、description、tasks。
+12. 每个 task 必须有 title、target、progress。
 
 最新道法 JSON schema：
 {
   "name": "架子鼓",
   "description": "从节拍稳定、肢体协调、律动表达一路修到可录音、可现场、可即兴、可形成个人风格的架子鼓修行路线。",
-  "color": "#8b6f24",
   "realms": [
     {
       "summary": "此境界的核心目标、能力边界、完成后应该呈现的状态。",
@@ -784,7 +784,7 @@ function normalizeDaoSchemaSkill(value: unknown, preset: Preset, index: number):
     id: uid("skill"),
     name: readString(raw.name, `道 ${index + 1}`),
     description: readString(raw.description, "自定义这条道的修炼目标。"),
-    color: readString(raw.color, COLORS[index % COLORS.length]),
+    color: COLORS[index % COLORS.length],
     presetName: preset.name,
     realms: rawRealms.map((realm, realmIndex) =>
       normalizeDaoRealm(realm, realmIndex, preset),

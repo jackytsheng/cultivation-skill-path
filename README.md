@@ -264,13 +264,13 @@ cultivation-progress.json
 
 - 道名
 - 此道目标
-- 主题颜色
 - 境界数量
 - 每个境界的说明
 - 每境十层
 - 每层标题、说明和任务
 
 道法 JSON 不要包含完整存档字段，例如 `version`、`skills`、`storage`、`activity`、`id`、`createdAt`、`updatedAt`。
+道法秘籍也不需要包含 `color`。应用会在导入时按当前顺序自动分配主题色：绿、红、金、蓝、紫循环。
 
 道法秘籍只接受文件：
 
@@ -284,7 +284,6 @@ cultivation-progress.json
 {
   "name": "架子鼓",
   "description": "从稳定节拍、肢体协调、律动表达，一路修到可录音、可现场、可即兴、可形成个人风格的架子鼓修行路线。",
-  "color": "#8b6f24",
   "realms": [
     {
       "summary": "此境界的核心目标、能力边界、完成后应该呈现的状态。",
