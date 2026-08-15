@@ -142,6 +142,7 @@ const PROGRESS_FILE_NAME = "cultivation-progress.json";
 const DEFAULT_TIMESTAMP = "2026-08-14T00:00:00.000Z";
 const COLORS = ["#2f7d5c", "#a04d3f", "#8b6f24", "#4e6b8f", "#7b5c8f"];
 const LAYERS_PER_REALM = 10;
+const REALMS_PER_PAGE = 10;
 const SKILLS_PER_PAGE = 5;
 const ACTIVITY_DAYS_PER_PAGE = 112;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -550,14 +551,6 @@ function realmStats(realm: Realm): TaskStats {
     percent: total === 0 ? 0 : Math.round((done / total) * 100),
     complete: total > 0 && done >= total,
   };
-}
-
-function visibleRealmWindow(realms: Realm[], currentIndex: number) {
-  if (realms.length <= 10) {
-    return realms;
-  }
-  const start = Math.max(0, Math.min(currentIndex - 4, realms.length - 10));
-  return realms.slice(start, start + 10);
 }
 
 function dateKey(date = new Date()) {
@@ -1166,6 +1159,7 @@ export function CultivationApp() {
   const [promptVaultOpen, setPromptVaultOpen] = useState(false);
   const [selectedRealmId, setSelectedRealmId] = useState("");
   const [selectedLayerId, setSelectedLayerId] = useState("");
+  const [manualRealmPage, setManualRealmPage] = useState<number | null>(null);
   const [skillPage, setSkillPage] = useState(0);
   const [newRealmName, setNewRealmName] = useState("");
   const [status, setStatus] = useState("本机自动保存已开启");
@@ -1217,15 +1211,28 @@ export function CultivationApp() {
     currentSkillPage * SKILLS_PER_PAGE,
     currentSkillPage * SKILLS_PER_PAGE + SKILLS_PER_PAGE,
   );
-  const currentRealmIndex = Math.max(
+  const selectedRealmIndex = Math.max(
     0,
-    activeSkill?.realms.findIndex(
-      (realm) => realm.id === activeStats?.currentRealm?.id,
-    ) ?? 0,
+    activeSkill?.realms.findIndex((realm) => realm.id === selectedRealm?.id) ?? 0,
   );
+  const realmPageCount = activeSkill
+    ? Math.max(1, Math.ceil(activeSkill.realms.length / REALMS_PER_PAGE))
+    : 1;
+  const selectedRealmPage = Math.floor(selectedRealmIndex / REALMS_PER_PAGE);
+  const currentRealmPage = Math.min(
+    manualRealmPage ?? selectedRealmPage,
+    realmPageCount - 1,
+  );
+  const visibleRealmStart = currentRealmPage * REALMS_PER_PAGE;
   const visibleRealms = activeSkill
-    ? visibleRealmWindow(activeSkill.realms, currentRealmIndex)
+    ? activeSkill.realms.slice(
+        visibleRealmStart,
+        visibleRealmStart + REALMS_PER_PAGE,
+      )
     : [];
+  const visibleRealmEnd = activeSkill
+    ? Math.min(activeSkill.realms.length, visibleRealmStart + visibleRealms.length)
+    : 0;
   const activeTasks = useMemo(
     () =>
       activeSkill
@@ -1334,6 +1341,14 @@ export function CultivationApp() {
     }));
   }
 
+  function selectRealmPath(realmId: string, layerId?: string) {
+    setSelectedRealmId(realmId);
+    if (layerId !== undefined) {
+      setSelectedLayerId(layerId);
+    }
+    setManualRealmPage(null);
+  }
+
   function addSkill() {
     const preset =
       SELECTABLE_PRESETS.find((item) => item.id === newSkillPreset) ??
@@ -1351,8 +1366,7 @@ export function CultivationApp() {
       activeSkillId: skill.id,
       skills: [...current.skills, skill],
     }));
-    setSelectedRealmId(skill.realms[0]?.id ?? "");
-    setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
+    selectRealmPath(skill.realms[0]?.id ?? "", skill.realms[0]?.layers[0]?.id ?? "");
     setNewSkillName("");
     setNewSkillDescription("");
     setView("practice");
@@ -1388,8 +1402,10 @@ export function CultivationApp() {
       };
     });
     if (state.activeSkillId === skillId) {
-      setSelectedRealmId(nextActiveSkill?.realms[0]?.id ?? "");
-      setSelectedLayerId(nextActiveSkill?.realms[0]?.layers[0]?.id ?? "");
+      selectRealmPath(
+        nextActiveSkill?.realms[0]?.id ?? "",
+        nextActiveSkill?.realms[0]?.layers[0]?.id ?? "",
+      );
     }
     setSkillPage((page) =>
       Math.min(page, Math.max(0, Math.ceil(nextSkills.length / SKILLS_PER_PAGE) - 1)),
@@ -1444,8 +1460,7 @@ export function CultivationApp() {
       presetName: preset.name,
       realms,
     }));
-    setSelectedRealmId(nextRealm?.id ?? "");
-    setSelectedLayerId(nextRealm?.layers[nextLayerIndex]?.id ?? "");
+    selectRealmPath(nextRealm?.id ?? "", nextRealm?.layers[nextLayerIndex]?.id ?? "");
     setStatus(`已套用${preset.name}，原有层级任务已按位置保留`);
   }
 
@@ -1475,8 +1490,7 @@ export function CultivationApp() {
       presetName: "自定义路线",
       realms: [...skill.realms, realm],
     }));
-    setSelectedRealmId(realm.id);
-    setSelectedLayerId(realm.layers[0]?.id ?? "");
+    selectRealmPath(realm.id, realm.layers[0]?.id ?? "");
     setNewRealmName("");
   }
 
@@ -1489,8 +1503,7 @@ export function CultivationApp() {
       return { ...skill, presetName: "自定义路线", realms };
     });
     const nextRealm = activeSkill.realms.find((realm) => realm.id !== realmId);
-    setSelectedRealmId(nextRealm?.id ?? "");
-    setSelectedLayerId(nextRealm?.layers[0]?.id ?? "");
+    selectRealmPath(nextRealm?.id ?? "", nextRealm?.layers[0]?.id ?? "");
   }
 
   function updateLayer(realmId: string, layerId: string, patch: Partial<Layer>) {
@@ -1786,8 +1799,7 @@ export function CultivationApp() {
       activeSkillId: skill.id,
       skills: [...current.skills, skill],
     }));
-    setSelectedRealmId(skill.realms[0]?.id ?? "");
-    setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
+    selectRealmPath(skill.realms[0]?.id ?? "", skill.realms[0]?.layers[0]?.id ?? "");
     setStatus(`道法“${skill.name}”已导入`);
     setView("practice");
   }
@@ -1857,7 +1869,33 @@ export function CultivationApp() {
         </section>
 
         <section className="realm-card" aria-label="境界进度">
-          <PanelHeading title="境界" />
+          <div className="realm-card-head">
+            <PanelHeading title="境界" />
+            <div className="realm-pager" aria-label="境界分页">
+              <button
+                aria-label="查看前十个境界"
+                onClick={() => setManualRealmPage(Math.max(0, currentRealmPage - 1))}
+                disabled={currentRealmPage === 0}
+              >
+                ‹
+              </button>
+              <b>
+                {activeSkill.realms.length > 0
+                  ? `${visibleRealmStart + 1}-${visibleRealmEnd}`
+                  : "0"}{" "}
+                / 共 {activeSkill.realms.length} 境
+              </b>
+              <button
+                aria-label="查看后十个境界"
+                onClick={() =>
+                  setManualRealmPage(Math.min(realmPageCount - 1, currentRealmPage + 1))
+                }
+                disabled={currentRealmPage >= realmPageCount - 1}
+              >
+                ›
+              </button>
+            </div>
+          </div>
           <div className="realm-orbit-list">
             {visibleRealms.map((realm) => {
               const unlocked = canAdvanceRealm(activeSkill, realm.id);
@@ -1875,8 +1913,7 @@ export function CultivationApp() {
                     unlocked ? "" : "locked"
                   }`}
                   onClick={() => {
-                    setSelectedRealmId(realm.id);
-                    setSelectedLayerId(realm.layers[0]?.id ?? "");
+                    selectRealmPath(realm.id, realm.layers[0]?.id ?? "");
                     setView("practice");
                   }}
                 >
@@ -2010,8 +2047,7 @@ export function CultivationApp() {
                         ...current,
                         activeSkillId: skill.id,
                       }));
-                      setSelectedRealmId(stats.currentRealm?.id ?? "");
-                      setSelectedLayerId(stats.currentLayer?.id ?? "");
+                      selectRealmPath(stats.currentRealm?.id ?? "", stats.currentLayer?.id ?? "");
                       setView("practice");
                     }}
                   >
@@ -2167,8 +2203,7 @@ export function CultivationApp() {
                         activeSkillId: skill.id,
                       }));
                       setView("practice");
-                      setSelectedRealmId(stats.currentRealm?.id ?? "");
-                      setSelectedLayerId(stats.currentLayer?.id ?? "");
+                      selectRealmPath(stats.currentRealm?.id ?? "", stats.currentLayer?.id ?? "");
                     }}
                   >
                     入道
@@ -2432,8 +2467,7 @@ export function CultivationApp() {
                       } ${unlocked ? "" : "locked"}`}
                       title={unlocked ? realm.name : `未解锁：先完成 ${gateLabel}`}
                       onClick={() => {
-                        setSelectedRealmId(realm.id);
-                        setSelectedLayerId(realm.layers[0]?.id ?? "");
+                        selectRealmPath(realm.id, realm.layers[0]?.id ?? "");
                       }}
                     >
                       <span>{realm.name}</span>
@@ -2508,8 +2542,10 @@ export function CultivationApp() {
                   <button
                     className="jump-button"
                     onClick={() => {
-                      setSelectedRealmId(activeStats.currentRealm?.id ?? "");
-                      setSelectedLayerId(activeStats.currentLayer?.id ?? "");
+                      selectRealmPath(
+                        activeStats.currentRealm?.id ?? "",
+                        activeStats.currentLayer?.id ?? "",
+                      );
                     }}
                   >
                     跳到当前层

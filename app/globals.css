@@ -1335,6 +1335,20 @@ h3 {
   padding: 22px 24px 20px;
 }
 
+.realm-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d9cbb0;
+}
+
+.realm-card-head .panel-heading {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .panel-heading {
   display: flex;
   align-items: center;
@@ -1362,6 +1376,45 @@ h3 {
 
 .heading-diamond.gold {
   background: var(--gold);
+}
+
+.realm-pager {
+  display: grid;
+  grid-template-columns: 28px minmax(0, auto) 28px;
+  gap: 8px;
+  align-items: center;
+  justify-content: end;
+}
+
+.realm-pager button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-color: rgba(198, 171, 112, 0.58);
+  border-radius: 50%;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.96), rgba(232, 218, 188, 0.94)),
+    #f3e6c9;
+  color: #7c5c24;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.realm-pager button:hover:not(:disabled) {
+  border-color: rgba(154, 104, 23, 0.68);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 245, 0.98), rgba(224, 206, 165, 0.96)),
+    #ead8ae;
+}
+
+.realm-pager b {
+  color: var(--gold);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .realm-orbit-list {
@@ -2064,6 +2117,7 @@ h3 {
   .topbar,
   .hero-grid,
   .command-strip,
+  .realm-card-head,
   .section-heading,
   .editor-heading {
     align-items: stretch;
