@@ -2,6 +2,7 @@
 
 import {
   type ChangeEvent,
+  type CSSProperties,
   type ReactNode,
   useEffect,
   useMemo,
@@ -31,6 +32,15 @@ type Realm = {
   layers: Layer[];
 };
 
+type ActivityDay = {
+  date: string;
+  completedTasks: number;
+  layerUps: string[];
+  realmUps: string[];
+  grandMastery: boolean;
+  updatedAt: string;
+};
+
 type Skill = {
   id: string;
   name: string;
@@ -38,14 +48,22 @@ type Skill = {
   color: string;
   presetName: string;
   realms: Realm[];
+  activity: ActivityDay[];
   createdAt: string;
   updatedAt: string;
+};
+
+type StorageInfo = {
+  progressFileName: string;
+  localFolderName?: string;
+  localFolderLinkedAt?: string;
 };
 
 type AppState = {
   version: 1;
   updatedAt: string;
   activeSkillId: string;
+  storage: StorageInfo;
   skills: Skill[];
 };
 
@@ -124,6 +142,9 @@ const PROGRESS_FILE_NAME = "cultivation-progress.json";
 const DEFAULT_TIMESTAMP = "2026-08-14T00:00:00.000Z";
 const COLORS = ["#2f7d5c", "#a04d3f", "#8b6f24", "#4e6b8f", "#7b5c8f"];
 const LAYERS_PER_REALM = 10;
+const SKILLS_PER_PAGE = 5;
+const ACTIVITY_DAYS_PER_PAGE = 112;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const PRESETS: Preset[] = [
   {
@@ -195,47 +216,59 @@ const PRESETS: Preset[] = [
 
 const SELECTABLE_PRESETS = PRESETS.filter((preset) => preset.selectable !== false);
 
-function presetLayerCount(preset: Preset) {
-  return preset.realms.length * LAYERS_PER_REALM;
-}
-
 function presetOptionLabel(preset: Preset) {
-  return `${preset.name}（共${presetLayerCount(preset)}层）`;
+  return `${preset.name}（共${preset.realms.length}境界）`;
 }
 
-const AI_IMPORT_PROMPT = `你是一个“修仙式诸道修行系统”的配置助手。请根据我给你的修行目标，返回一份可以直接导入网页应用的 JSON。
+function daoSchemaPrompt(preset: Preset) {
+  return `你是一个“修仙式成长系统”的道法策划 agent。用户会先把这整段“道法引”发给你，然后由你主动索取最少必要信息，再把长期修行路径完整推演成一条可以直接导入网页应用的“道法 JSON”。
 
-硬性要求：
-1. 只返回合法 JSON，不要 Markdown，不要解释。
-2. 每个 skill 字段代表一条独立的“道”，字段名保持 skills 以便应用导入。
-3. 每个 realm 是一个境界，用户可以用预设境界，也可以自定义、删减境界。
-4. 每个 realm 必须正好有 10 个 layers。
-5. 每个 layer 都要有 title、description、tasks。
-6. 每个 task 都要有 title、target、progress；target 是需要完成的次数，progress 通常从 0 开始。
-7. task 的 target 应该具体、可执行，不要写空泛目标。
+两段式流程：
+1. 如果用户还没有提供“我想学”和“我眼中的顶级状态”，不要生成 JSON。请只回复下面这个表单，不要加其它解释：
+请填两项，我再为你生成可导入的道法 JSON：
+我想学：
+我眼中的顶级状态：
 
-JSON 结构：
+2. 如果用户已经提供了“我想学”和“我眼中的顶级状态”，请不要继续追问，直接生成完整道法 JSON。
+3. 如果用户额外提供了当前水平、每周投入时间、偏好的任务强度或希望境界数量，就纳入规划；如果没提供，请自行做合理假设。
+
+生成任务：
+1. 把用户想学的能力抽象成“一道”，从入门到顶级状态拆成境界、十层、任务。
+2. 按用户的“顶级状态”反推最终境界，再倒推中间路径。
+3. 每一层都要有清晰 title 和 description，像一条真实训练路线，而不是空泛口号。
+4. 每层任务要可执行、可打卡、可累计次数。任务可以包含练习、复盘、作品、测验、反馈、输出。
+5. 每个任务的 target 是完成次数，建议 3 到 30 之间；progress 必须写 0。
+6. 任务颗粒度默认每层 3 到 5 个任务；如果用户特别说明，可以调整。
+7. 任务难度要随层数递进：前期重基础和稳定，中期重综合和应用，后期重创作、实战、风格、长期稳定性。
+
+生成 JSON 时的导入规则：
+1. 只返回合法 JSON，不要 Markdown，不要解释，不要代码块。
+2. 这是单条“道法 JSON”，不是完整存档；不要输出 version、skills、storage、activity、id、createdAt、updatedAt。
+3. 当前选择的预设路线是：${preset.name}（共${preset.realms.length}境界）。
+4. 网页导入时会按这个预设路线给境界命名：${preset.realms.join(" → ")}。
+5. 你不需要输出 realm.name；每个 realm 只写 summary 和 layers。
+6. 如果用户没有指定境界数量，请你根据这项能力的学习跨度、复杂度和顶级状态自行决定 realms 数量；常见可以是 5 到 13 个境界，但不要机械套用预设数量。
+7. 如果你返回的 realms 少于预设数量，网页只导入你返回的境界，后面多余境界会去掉。
+8. 如果你返回的 realms 多于预设数量，网页会把多出来的境界自动命名为“境界${preset.realms.length + 1}”“境界${preset.realms.length + 2}”等。
+9. 每个 realm 必须有 summary 和正好 10 个 layers。
+10. 每个 layer 必须有 title、description、tasks。
+11. 每个 task 必须有 title、target、progress。
+
+最新道法 JSON schema：
 {
-  "version": 1,
-  "skills": [
+  "name": "架子鼓",
+  "description": "从节拍稳定、肢体协调、律动表达一路修到可录音、可现场、可即兴、可形成个人风格的架子鼓修行路线。",
+  "color": "#8b6f24",
+  "realms": [
     {
-      "name": "架子鼓",
-      "description": "用修炼境界管理架子鼓练习这条道",
-      "presetName": "绝世战神武道路线",
-      "realms": [
+      "summary": "此境界的核心目标、能力边界、完成后应该呈现的状态。",
+      "layers": [
         {
-          "name": "淬体境",
-          "summary": "基本功和稳定节拍",
-          "layers": [
-            {
-              "number": 1,
-              "title": "稳住四分音符",
-              "description": "能在慢速下稳定跟拍，不抢拍不拖拍。",
-              "tasks": [
-                { "title": "60 BPM 四分音符跟节拍器练习", "target": 8, "progress": 0 },
-                { "title": "记录练习复盘", "target": 3, "progress": 0 }
-              ]
-            }
+          "title": "本层名称",
+          "description": "本层要修成的具体能力标准。",
+          "tasks": [
+            { "title": "可执行任务名称", "target": 8, "progress": 0 },
+            { "title": "另一个可打卡任务", "target": 5, "progress": 0 }
           ]
         }
       ]
@@ -243,12 +276,8 @@ JSON 结构：
   ]
 }
 
-请现在为这条道生成完整 JSON：
-道名：
-此道目标：
-偏好的境界路线：
-希望每层任务数量：
-每个任务的大致完成次数：`;
+现在开始执行本“道法引”：如果用户还没给出“我想学”和“我眼中的顶级状态”，先索取这两项；如果已经给出，就直接输出可导入 JSON。`;
+}
 
 function makeLayer(
   baseId: string,
@@ -310,6 +339,7 @@ function makeSkillFromPreset(
     presetName: preset.name,
     createdAt: DEFAULT_TIMESTAMP,
     updatedAt: DEFAULT_TIMESTAMP,
+    activity: [],
     realms: preset.realms.map((realmName, index) =>
       makeRealm(baseId, realmName, index),
     ),
@@ -375,6 +405,9 @@ function createDefaultState(): AppState {
     version: 1,
     updatedAt: DEFAULT_TIMESTAMP,
     activeSkillId: skill.id,
+    storage: {
+      progressFileName: PROGRESS_FILE_NAME,
+    },
     skills: [skill],
   };
 }
@@ -492,6 +525,122 @@ function visibleRealmWindow(realms: Realm[], currentIndex: number) {
   return realms.slice(start, start + 10);
 }
 
+function dateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateFromKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function addDays(key: string, amount: number) {
+  const date = dateFromKey(key);
+  date.setDate(date.getDate() + amount);
+  return dateKey(date);
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function activityWindow(activity: ActivityDay[], dayCount = ACTIVITY_DAYS_PER_PAGE, pageOffset = 0) {
+  const byDate = new Map(activity.map((day) => [day.date, day]));
+  const end = addDays(dateKey(), -pageOffset * dayCount);
+  const start = addDays(end, -(dayCount - 1));
+  return Array.from({ length: dayCount }, (_, index) => {
+    const date = addDays(start, index);
+    return {
+      date,
+      entry: byDate.get(date),
+    };
+  });
+}
+
+function activityMaxPageOffset(activity: ActivityDay[], dayCount = ACTIVITY_DAYS_PER_PAGE) {
+  if (activity.length === 0) {
+    return 0;
+  }
+  const oldestTime = Math.min(
+    ...activity.map((day) => dateFromKey(day.date).getTime()),
+  );
+  const todayTime = dateFromKey(dateKey()).getTime();
+  const distance = Math.max(0, Math.floor((todayTime - oldestTime) / DAY_MS));
+  return Math.floor(distance / dayCount);
+}
+
+function shortDateLabel(key: string) {
+  const [, month = "1", day = "1"] = key.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function compactRealmName(name: string) {
+  if (name.includes("/")) {
+    return name.split("/").filter(Boolean);
+  }
+  const chars = Array.from(name);
+  return chars.length >= 3
+    ? [chars.slice(0, 2).join(""), chars.slice(2).join("")]
+    : [name];
+}
+
+function layerCompletionLabels(before: Skill, after: Skill) {
+  const beforeEntries = new Map(
+    orderedLayerEntries(before).map((entry) => [
+      entry.layer.id,
+      layerStats(entry.layer).complete,
+    ]),
+  );
+  return orderedLayerEntries(after)
+    .filter(
+      (entry) =>
+        layerStats(entry.layer).complete && beforeEntries.get(entry.layer.id) !== true,
+    )
+    .map((entry) => `${entry.realm.name} · 第${entry.layer.number}层`);
+}
+
+function realmPromotionLabels(before: Skill, after: Skill) {
+  return after.realms.flatMap((realm, index) => {
+    const wasComplete =
+      before.realms.find((item) => item.id === realm.id)?.layers.every(
+        (layer) => layerStats(layer).complete,
+      ) ?? false;
+    const isComplete = realm.layers.every((layer) => layerStats(layer).complete);
+    const nextRealm = after.realms[index + 1];
+    return isComplete && !wasComplete && nextRealm ? [`晋升至 ${nextRealm.name}`] : [];
+  });
+}
+
+function recordActivity(before: Skill, after: Skill, completedTasks: number): Skill {
+  const layerUps = layerCompletionLabels(before, after);
+  const realmUps = realmPromotionLabels(before, after);
+  const grandMastery = !skillStats(before).complete && skillStats(after).complete;
+  if (completedTasks <= 0 && layerUps.length === 0 && realmUps.length === 0 && !grandMastery) {
+    return after;
+  }
+  const today = dateKey();
+  const now = new Date().toISOString();
+  const current = after.activity.find((day) => day.date === today);
+  const merged: ActivityDay = {
+    date: today,
+    completedTasks: (current?.completedTasks ?? 0) + Math.max(0, completedTasks),
+    layerUps: uniqueValues([...(current?.layerUps ?? []), ...layerUps]),
+    realmUps: uniqueValues([...(current?.realmUps ?? []), ...realmUps]),
+    grandMastery: Boolean(current?.grandMastery || grandMastery),
+    updatedAt: now,
+  };
+  return {
+    ...after,
+    activity: [
+      ...after.activity.filter((day) => day.date !== today),
+      merged,
+    ].sort((left, right) => left.date.localeCompare(right.date)),
+  };
+}
+
 function readString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -550,6 +699,89 @@ function normalizeRealm(value: unknown, index: number): Realm {
   };
 }
 
+function normalizeDaoLayer(value: unknown, index: number, realmName: string): Layer {
+  const layer = normalizeLayer(value, index, realmName);
+  return {
+    ...layer,
+    id: uid("layer"),
+    tasks: layer.tasks.map((task) => ({
+      ...task,
+      id: uid("task"),
+      progress: 0,
+    })),
+  };
+}
+
+function normalizeDaoRealm(value: unknown, index: number, preset: Preset): Realm {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const name = preset.realms[index] ?? `境界${index + 1}`;
+  const rawLayers = Array.isArray(raw.layers) ? raw.layers : [];
+  return {
+    id: uid("realm"),
+    name,
+    summary: readString(raw.summary, "自定义这个境界的核心主题。"),
+    layers: Array.from({ length: LAYERS_PER_REALM }, (_, layerIndex) =>
+      normalizeDaoLayer(rawLayers[layerIndex], layerIndex, name),
+    ),
+  };
+}
+
+function readDaoSkillSchema(value: unknown) {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  if (Array.isArray(raw.skills) && raw.skills[0]) {
+    return raw.skills[0];
+  }
+  if (raw.skill && typeof raw.skill === "object") {
+    return raw.skill;
+  }
+  return value;
+}
+
+function normalizeDaoSchemaSkill(value: unknown, preset: Preset, index: number): Skill {
+  const schema = readDaoSkillSchema(value);
+  const raw = schema && typeof schema === "object" ? (schema as Record<string, unknown>) : {};
+  const rawRealms = Array.isArray(raw.realms) ? raw.realms : [];
+  if (rawRealms.length === 0) {
+    throw new Error("道法 JSON 里没有 realms，无法导入整条道。");
+  }
+  const now = new Date().toISOString();
+  return {
+    id: uid("skill"),
+    name: readString(raw.name, `道 ${index + 1}`),
+    description: readString(raw.description, "自定义这条道的修炼目标。"),
+    color: readString(raw.color, COLORS[index % COLORS.length]),
+    presetName: preset.name,
+    realms: rawRealms.map((realm, realmIndex) =>
+      normalizeDaoRealm(realm, realmIndex, preset),
+    ),
+    activity: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizeActivityDay(value: unknown): ActivityDay | undefined {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const date = typeof raw.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date)
+    ? raw.date
+    : "";
+  if (!date) {
+    return undefined;
+  }
+  return {
+    date,
+    completedTasks: Math.max(0, Math.floor(readNumber(raw.completedTasks, 0))),
+    layerUps: Array.isArray(raw.layerUps)
+      ? raw.layerUps.filter((item): item is string => typeof item === "string")
+      : [],
+    realmUps: Array.isArray(raw.realmUps)
+      ? raw.realmUps.filter((item): item is string => typeof item === "string")
+      : [],
+    grandMastery: Boolean(raw.grandMastery),
+    updatedAt: readString(raw.updatedAt, new Date().toISOString()),
+  };
+}
+
 function normalizeSkill(value: unknown, index: number): Skill {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const preset =
@@ -570,8 +802,28 @@ function normalizeSkill(value: unknown, index: number): Skill {
     color: readString(raw.color, COLORS[index % COLORS.length]),
     presetName: readString(raw.presetName, preset.name),
     realms,
+    activity: Array.isArray(raw.activity)
+      ? raw.activity
+          .map((day) => normalizeActivityDay(day))
+          .filter((day): day is ActivityDay => Boolean(day))
+      : [],
     createdAt: readString(raw.createdAt, now),
     updatedAt: readString(raw.updatedAt, now),
+  };
+}
+
+function normalizeStorage(value: unknown): StorageInfo {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    progressFileName: readString(raw.progressFileName, PROGRESS_FILE_NAME),
+    localFolderName:
+      typeof raw.localFolderName === "string" && raw.localFolderName.trim()
+        ? raw.localFolderName.trim()
+        : undefined,
+    localFolderLinkedAt:
+      typeof raw.localFolderLinkedAt === "string" && raw.localFolderLinkedAt.trim()
+        ? raw.localFolderLinkedAt.trim()
+        : undefined,
   };
 }
 
@@ -590,6 +842,7 @@ function normalizeImport(value: unknown): AppState {
     version: 1,
     updatedAt: new Date().toISOString(),
     activeSkillId: readString(raw.activeSkillId, skills[0].id),
+    storage: normalizeStorage(raw.storage),
     skills,
   };
 }
@@ -603,6 +856,7 @@ function mergeImportedState(current: AppState, imported: AppState): AppState {
     version: 1,
     updatedAt: new Date().toISOString(),
     activeSkillId: incoming[0]?.id ?? current.activeSkillId,
+    storage: current.storage,
     skills: [...current.skills, ...incoming],
   };
 }
@@ -697,6 +951,101 @@ function ProgressBar({ percent, tone }: { percent: number; tone?: string }) {
   );
 }
 
+function activityTooltip(date: string, entry?: ActivityDay) {
+  if (!entry) {
+    return `${date}\n暂无打卡`;
+  }
+  const lines = [`${date} 完成 ${entry.completedTasks} 项功课`];
+  if (entry.layerUps.length > 0) {
+    lines.push(`破层：${entry.layerUps.join("、")}`);
+  }
+  if (entry.realmUps.length > 0) {
+    lines.push(`升阶：${entry.realmUps.join("、")}`);
+  }
+  if (entry.grandMastery) {
+    lines.push("大圆满：此道全境圆满");
+  }
+  return lines.join("\n");
+}
+
+function activityCellClass(entry?: ActivityDay) {
+  if (!entry) {
+    return "activity-cell";
+  }
+  const level = Math.min(4, Math.max(1, Math.ceil(entry.completedTasks / 2)));
+  const milestone = entry.grandMastery
+    ? "grand"
+    : entry.realmUps.length > 0
+      ? "realm-up"
+      : entry.layerUps.length > 0
+        ? "layer-up"
+        : "";
+  return ["activity-cell", `level-${level}`, milestone]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function ActivityGrid({ skill }: { skill: Skill }) {
+  const maxPageOffset = activityMaxPageOffset(skill.activity);
+  const [pageOffset, setPageOffset] = useState(0);
+  const visiblePageOffset = Math.min(pageOffset, maxPageOffset);
+  const days = activityWindow(
+    skill.activity,
+    ACTIVITY_DAYS_PER_PAGE,
+    visiblePageOffset,
+  );
+  const total = days.reduce((sum, day) => sum + (day.entry?.completedTasks ?? 0), 0);
+  const rangeLabel =
+    visiblePageOffset === 0
+      ? "近 16 周"
+      : `${shortDateLabel(days[0]?.date ?? "")} - ${shortDateLabel(days.at(-1)?.date ?? "")}`;
+  return (
+    <div
+      className="dao-ledger"
+      style={{ "--dao-color": skill.color } as CSSProperties}
+    >
+      <div className="dao-ledger-head">
+        <span>道历打卡</span>
+        <div className="dao-ledger-controls" aria-label={`${skill.name} 道历翻页`}>
+          <button
+            type="button"
+            aria-label="往前翻看更早道历"
+            onClick={() =>
+              setPageOffset(Math.min(maxPageOffset, visiblePageOffset + 1))
+            }
+            disabled={visiblePageOffset >= maxPageOffset}
+          >
+            ◀
+          </button>
+          <b>{rangeLabel} · {total} 项</b>
+          <button
+            type="button"
+            aria-label="往后翻看更新道历"
+            onClick={() => setPageOffset(Math.max(0, visiblePageOffset - 1))}
+            disabled={visiblePageOffset === 0}
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+      <div className="activity-grid" aria-label={`${skill.name} 道历打卡`}>
+        {days.map(({ date, entry }) => {
+          const tooltip = activityTooltip(date, entry);
+          return (
+            <button
+              type="button"
+              key={date}
+              className={activityCellClass(entry)}
+              data-tooltip={tooltip}
+              aria-label={tooltip}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StatBox({
   label,
   value,
@@ -762,8 +1111,14 @@ export function CultivationApp() {
   const [newSkillPreset, setNewSkillPreset] = useState(
     SELECTABLE_PRESETS[0]?.id ?? PRESETS[0].id,
   );
+  const [daoImportPreset, setDaoImportPreset] = useState(
+    SELECTABLE_PRESETS[0]?.id ?? PRESETS[0].id,
+  );
+  const [daoImportText, setDaoImportText] = useState("");
+  const [promptVaultOpen, setPromptVaultOpen] = useState(false);
   const [selectedRealmId, setSelectedRealmId] = useState("");
   const [selectedLayerId, setSelectedLayerId] = useState("");
+  const [skillPage, setSkillPage] = useState(0);
   const [newRealmName, setNewRealmName] = useState("");
   const [status, setStatus] = useState("本机自动保存已开启");
   const [fileApiSupported, setFileApiSupported] = useState(false);
@@ -784,6 +1139,7 @@ export function CultivationApp() {
     selectedRealm?.layers.find((layer) => layer.id === selectedLayerId) ??
     activeStats?.currentLayer ??
     selectedRealm?.layers[0];
+  const selectedRealmStats = selectedRealm ? realmStats(selectedRealm) : undefined;
   const selectedLayerStats = selectedLayer ? layerStats(selectedLayer) : undefined;
   const selectedLayerUnlocked =
     activeSkill && selectedRealm && selectedLayer
@@ -794,6 +1150,20 @@ export function CultivationApp() {
   const profileStats = useMemo(
     () => state.skills.map((skill) => ({ skill, stats: skillStats(skill) })),
     [state.skills],
+  );
+  const skillPageCount = Math.max(
+    1,
+    Math.ceil(profileStats.length / SKILLS_PER_PAGE),
+  );
+  const currentSkillPage = Math.min(skillPage, skillPageCount - 1);
+  const activeSkillIndex = profileStats.findIndex(
+    ({ skill }) => skill.id === state.activeSkillId,
+  );
+  const activeSkillPage =
+    activeSkillIndex >= 0 ? Math.floor(activeSkillIndex / SKILLS_PER_PAGE) : 0;
+  const visibleProfileStats = profileStats.slice(
+    currentSkillPage * SKILLS_PER_PAGE,
+    currentSkillPage * SKILLS_PER_PAGE + SKILLS_PER_PAGE,
   );
   const currentRealmIndex = Math.max(
     0,
@@ -823,6 +1193,14 @@ export function CultivationApp() {
       waiting: activeTasks.filter((task) => task.progress === 0).length,
     }),
     [activeTasks],
+  );
+  const selectedDaoImportPreset =
+    SELECTABLE_PRESETS.find((item) => item.id === daoImportPreset) ??
+    SELECTABLE_PRESETS[0] ??
+    PRESETS[0];
+  const currentDaoSchemaPrompt = useMemo(
+    () => daoSchemaPrompt(selectedDaoImportPreset),
+    [selectedDaoImportPreset],
   );
 
   useEffect(() => {
@@ -869,7 +1247,15 @@ export function CultivationApp() {
     }
     const timeout = window.setTimeout(() => {
       writeStateToDirectory(
-        { ...state, updatedAt: new Date().toISOString() },
+        {
+          ...state,
+          updatedAt: new Date().toISOString(),
+          storage: {
+            ...state.storage,
+            progressFileName: PROGRESS_FILE_NAME,
+            localFolderName: folderName || state.storage.localFolderName,
+          },
+        },
         directoryHandle,
       )
         .then(() => setStatus(`已同步到 ${folderName || "本地文件夹"}`))
@@ -920,22 +1306,42 @@ export function CultivationApp() {
     setView("practice");
   }
 
-  function deleteActiveSkill() {
-    if (!activeSkill || state.skills.length <= 1) {
+  function deleteSkill(skillId: string) {
+    if (state.skills.length <= 1) {
       return;
     }
-    const confirmed = window.confirm(`删除此道“${activeSkill.name}”？`);
+    const targetSkill = state.skills.find((skill) => skill.id === skillId);
+    if (!targetSkill) {
+      return;
+    }
+    const confirmed = window.confirm(`删除此道“${targetSkill.name}”？`);
     if (!confirmed) {
       return;
     }
+    const nextSkills = state.skills.filter((skill) => skill.id !== skillId);
+    const nextActiveSkillId =
+      state.activeSkillId === skillId
+        ? nextSkills[0]?.id ?? ""
+        : state.activeSkillId;
+    const nextActiveSkill = nextSkills.find((skill) => skill.id === nextActiveSkillId);
     updateState((current) => {
-      const skills = current.skills.filter((skill) => skill.id !== activeSkill.id);
+      const skills = current.skills.filter((skill) => skill.id !== skillId);
       return {
         ...current,
         skills,
-        activeSkillId: skills[0]?.id ?? "",
+        activeSkillId:
+          current.activeSkillId === skillId
+            ? skills[0]?.id ?? ""
+            : current.activeSkillId,
       };
     });
+    if (state.activeSkillId === skillId) {
+      setSelectedRealmId(nextActiveSkill?.realms[0]?.id ?? "");
+      setSelectedLayerId(nextActiveSkill?.realms[0]?.layers[0]?.id ?? "");
+    }
+    setSkillPage((page) =>
+      Math.min(page, Math.max(0, Math.ceil(nextSkills.length / SKILLS_PER_PAGE) - 1)),
+    );
   }
 
   function updateRealm(realmId: string, patch: Partial<Realm>) {
@@ -1006,41 +1412,51 @@ export function CultivationApp() {
       setStatus(`先完成 ${currentGateLabel(activeSkill)}，再推进后续层级`);
       return;
     }
-    updateActiveSkill((skill) => ({
-      ...skill,
-      realms: skill.realms.map((realm) =>
-        realm.id === realmId
-          ? {
-              ...realm,
-              layers: realm.layers.map((layer) =>
-                layer.id === layerId
-                  ? {
-                      ...layer,
-                      tasks: layer.tasks.map((task) => {
-                        if (task.id !== taskId) {
-                          return task;
-                        }
-                        const nextTarget = Math.max(
-                          1,
-                          Math.floor(patch.target ?? task.target),
-                        );
-                        return {
-                          ...task,
-                          ...patch,
-                          target: nextTarget,
-                          progress: clampProgress(
+    updateActiveSkill((skill) => {
+      let progressDelta = 0;
+      const nextSkill = {
+        ...skill,
+        realms: skill.realms.map((realm) =>
+          realm.id === realmId
+            ? {
+                ...realm,
+                layers: realm.layers.map((layer) =>
+                  layer.id === layerId
+                    ? {
+                        ...layer,
+                        tasks: layer.tasks.map((task) => {
+                          if (task.id !== taskId) {
+                            return task;
+                          }
+                          const nextTarget = Math.max(
+                            1,
+                            Math.floor(patch.target ?? task.target),
+                          );
+                          const nextProgress = clampProgress(
                             patch.progress ?? task.progress,
                             nextTarget,
-                          ),
-                        };
-                      }),
-                    }
-                  : layer,
-              ),
-            }
-          : realm,
-      ),
-    }));
+                          );
+                          if (changesProgress) {
+                            progressDelta += Math.max(0, nextProgress - task.progress);
+                          }
+                          return {
+                            ...task,
+                            ...patch,
+                            target: nextTarget,
+                            progress: nextProgress,
+                          };
+                        }),
+                      }
+                    : layer,
+                ),
+              }
+            : realm,
+        ),
+      };
+      return changesProgress && progressDelta > 0
+        ? recordActivity(skill, nextSkill, progressDelta)
+        : nextSkill;
+    });
   }
 
   function addTask(realmId: string, layerId: string) {
@@ -1103,8 +1519,20 @@ export function CultivationApp() {
     }
     try {
       const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+      const now = new Date().toISOString();
+      const nextState: AppState = {
+        ...state,
+        updatedAt: now,
+        storage: {
+          ...state.storage,
+          progressFileName: PROGRESS_FILE_NAME,
+          localFolderName: handle.name,
+          localFolderLinkedAt: now,
+        },
+      };
       await saveStoredDirectoryHandle(handle);
-      await writeStateToDirectory(state, handle);
+      await writeStateToDirectory(nextState, handle);
+      setState(nextState);
       setDirectoryHandle(handle);
       setFolderName(handle.name);
       setStatus(`已连接本地文件夹：${handle.name}`);
@@ -1121,10 +1549,19 @@ export function CultivationApp() {
       return;
     }
     try {
-      await writeStateToDirectory(
-        { ...state, updatedAt: new Date().toISOString() },
-        directoryHandle,
-      );
+      const now = new Date().toISOString();
+      const nextState: AppState = {
+        ...state,
+        updatedAt: now,
+        storage: {
+          ...state.storage,
+          progressFileName: PROGRESS_FILE_NAME,
+          localFolderName: folderName || state.storage.localFolderName,
+          localFolderLinkedAt: state.storage.localFolderLinkedAt ?? now,
+        },
+      };
+      await writeStateToDirectory(nextState, directoryHandle);
+      setState(nextState);
       setStatus(`已保存到 ${folderName || "本地文件夹"}`);
     } catch {
       setStatus("保存失败，请重新选择本地文件夹");
@@ -1132,7 +1569,15 @@ export function CultivationApp() {
   }
 
   async function exportJson() {
-    const exportState = { ...state, updatedAt: new Date().toISOString() };
+    const exportState = {
+      ...state,
+      updatedAt: new Date().toISOString(),
+      storage: {
+        ...state.storage,
+        progressFileName: PROGRESS_FILE_NAME,
+        localFolderName: folderName || state.storage.localFolderName,
+      },
+    };
     if (window.showSaveFilePicker) {
       try {
         const fileHandle = await window.showSaveFilePicker({
@@ -1147,7 +1592,7 @@ export function CultivationApp() {
         const stream = await fileHandle.createWritable();
         await stream.write(JSON.stringify(exportState, null, 2));
         await stream.close();
-        setStatus("JSON 已导出");
+        setStatus("存档已导出");
         return;
       } catch (error) {
         if ((error as Error).name === "AbortError") {
@@ -1156,7 +1601,7 @@ export function CultivationApp() {
       }
     }
     downloadJson(exportState);
-    setStatus("JSON 已下载");
+    setStatus("存档已下载");
   }
 
   async function importFile(file: File) {
@@ -1170,10 +1615,17 @@ export function CultivationApp() {
         isFullBackup &&
         window.confirm("检测到完整存档。确定覆盖当前全部道途？取消则合并导入。");
       updateState((current) => (overwrite ? imported : mergeImportedState(current, imported)));
-      setStatus(overwrite ? "存档已覆盖导入" : "JSON 已合并导入");
+      const importedFolder = imported.storage.localFolderName;
+      setStatus(
+        overwrite
+          ? importedFolder
+            ? `存档已覆盖导入；若要继续同步到 ${importedFolder}，请重新选择本地文件夹授权`
+            : "存档已覆盖导入"
+          : "存档已合并导入",
+      );
       setView("profile");
     } catch (error) {
-      setStatus((error as Error).message || "JSON 导入失败");
+      setStatus((error as Error).message || "存档导入失败");
     }
   }
 
@@ -1211,8 +1663,35 @@ export function CultivationApp() {
   }
 
   async function copyPrompt() {
-    await navigator.clipboard.writeText(AI_IMPORT_PROMPT);
-    setStatus("配置提示词已复制");
+    await navigator.clipboard.writeText(currentDaoSchemaPrompt);
+    setStatus("道法引已刻录");
+  }
+
+  function importDaoSchema() {
+    if (!daoImportText.trim()) {
+      setStatus("请先粘贴道法 JSON");
+      return;
+    }
+    try {
+      const parsed = JSON.parse(daoImportText) as unknown;
+      const skill = normalizeDaoSchemaSkill(
+        parsed,
+        selectedDaoImportPreset,
+        state.skills.length,
+      );
+      updateState((current) => ({
+        ...current,
+        activeSkillId: skill.id,
+        skills: [...current.skills, skill],
+      }));
+      setSelectedRealmId(skill.realms[0]?.id ?? "");
+      setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
+      setDaoImportText("");
+      setStatus(`道法“${skill.name}”已导入`);
+      setView("practice");
+    } catch (error) {
+      setStatus((error as Error).message || "道法导入失败");
+    }
   }
 
   if (!activeSkill || !activeStats) {
@@ -1232,7 +1711,9 @@ export function CultivationApp() {
             <p className="brand-subtitle">
               {activeSkill.name} <span>·</span> 修炼功法
             </p>
-            <p className="brand-meta">境界 · 十层 · 任务进度</p>
+            <p className="brand-meta">
+              {activeSkill.description.trim() || "此道目标尚未填写"}
+            </p>
           </div>
         </section>
 
@@ -1260,11 +1741,26 @@ export function CultivationApp() {
                     setView("practice");
                   }}
                 >
-                  {realm.name}
+                  {compactRealmName(realm.name).map((part, index) => (
+                    <span key={`${part}-${index}`}>{part}</span>
+                  ))}
                 </button>
               );
             })}
           </div>
+          {selectedRealm ? (
+            <div className="realm-brief" aria-live="polite">
+              <div>
+                <span>境界说明</span>
+                <strong>{selectedRealm.name}</strong>
+                <p>
+                  {selectedRealm.summary.trim() ||
+                    "在境界路线里写下此境界的目标、要求或修行纲领。"}
+                </p>
+              </div>
+              <b>{selectedRealmStats?.percent ?? 0}%</b>
+            </div>
+          ) : null}
           <div className="layer-path">
             {selectedRealm?.layers.map((layer) => {
               const stats = layerStats(layer);
@@ -1302,7 +1798,10 @@ export function CultivationApp() {
           </button>
           <button
             className={view === "profile" ? "active" : ""}
-            onClick={() => setView("profile")}
+            onClick={() => {
+              setSkillPage(activeSkillPage);
+              setView("profile");
+            }}
           >
             修为总览
           </button>
@@ -1310,13 +1809,13 @@ export function CultivationApp() {
             className={view === "prompt" ? "active" : ""}
             onClick={() => setView("prompt")}
           >
-            配置生成
+            道册
           </button>
         </nav>
         <span>{status}</span>
         <div className="command-actions">
           <button className="command-button import-command" onClick={importJson}>
-            导入配置
+            导入存档
           </button>
           <button className="command-button export-command" onClick={exportJson}>
             导出存档
@@ -1326,7 +1825,9 @@ export function CultivationApp() {
           </button>
         </div>
         {!fileApiSupported && (
-          <small>文件夹写入不可用时，仍会使用 localStorage 和 JSON 导入导出。</small>
+          <small>
+            当前浏览器未开放本地文件夹写入；仍会自动存到 localStorage，也可以手动导入/导出 JSON 存档。
+          </small>
         )}
         <input
           ref={fileInputRef}
@@ -1342,15 +1843,17 @@ export function CultivationApp() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">修为总览</p>
-              <h2>诸道境界</h2>
+              <h2>
+                诸道境界 <span>共 {state.skills.length} 道</span>
+              </h2>
             </div>
-            <strong>{state.skills.length} 条道</strong>
+            <strong>第 {currentSkillPage + 1} / {skillPageCount} 页</strong>
           </div>
           <div className="overview-management">
             <div className="cultivation-skill-panel">
               <PanelHeading title="诸道修行" />
               <div className="cultivation-rows">
-                {profileStats.map(({ skill, stats }, index) => (
+                {visibleProfileStats.map(({ skill, stats }, index) => (
                   <button
                     key={skill.id}
                     className={`cultivation-row ${
@@ -1367,7 +1870,9 @@ export function CultivationApp() {
                     }}
                   >
                     <span
-                      className={`round-seal seal-${(index % 4) + 1}`}
+                      className={`round-seal seal-${
+                        ((currentSkillPage * SKILLS_PER_PAGE + index) % 4) + 1
+                      }`}
                       aria-hidden="true"
                     >
                       {skill.name.slice(0, 1)}
@@ -1381,10 +1886,29 @@ export function CultivationApp() {
                   </button>
                 ))}
               </div>
+              <div className="cultivation-pager" aria-label="诸道修行分页">
+                <button
+                  onClick={() => setSkillPage((page) => Math.max(0, page - 1))}
+                  disabled={currentSkillPage === 0}
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {currentSkillPage + 1} / {skillPageCount} 页 · 5道/页
+                </span>
+                <button
+                  onClick={() =>
+                    setSkillPage((page) => Math.min(skillPageCount - 1, page + 1))
+                  }
+                  disabled={currentSkillPage >= skillPageCount - 1}
+                >
+                  下一页
+                </button>
+              </div>
             </div>
 
             <div className="overview-create-panel">
-              <PanelHeading title="开辟此道" tone="gold" />
+              <PanelHeading title="开辟新道" tone="gold" />
               <div className="new-skill">
                 <label>
                   新开一道
@@ -1418,25 +1942,54 @@ export function CultivationApp() {
                   </select>
                 </label>
                 <button className="primary-button" onClick={addSkill}>
-                  开辟此道
+                  开辟新道
+                </button>
+              </div>
+            </div>
+
+            <div className="overview-import-panel">
+              <PanelHeading title="道法导入" tone="red" />
+              <div className="dao-import">
+                <label>
+                  境界路线
+                  <select
+                    value={daoImportPreset}
+                    onChange={(event) => setDaoImportPreset(event.target.value)}
+                  >
+                    {SELECTABLE_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {presetOptionLabel(preset)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="jump-button" onClick={copyPrompt}>
+                  刻录道法引
+                </button>
+                <label>
+                  道法 JSON
+                  <textarea
+                    value={daoImportText}
+                    onChange={(event) => setDaoImportText(event.target.value)}
+                    placeholder="粘贴 AI 返回的整条道法 JSON"
+                  />
+                </label>
+                <button className="primary-button" onClick={importDaoSchema}>
+                  导入道法
                 </button>
               </div>
             </div>
           </div>
-          <div className="profile-grid">
-            {profileStats.map(({ skill, stats }) => (
-              <button
+          <div
+            className="profile-grid"
+            aria-label={`第 ${currentSkillPage + 1} 页诸道境界卡片`}
+          >
+            {visibleProfileStats.map(({ skill, stats }) => (
+              <article
                 key={skill.id}
-                className="profile-card"
-                onClick={() => {
-                  setState((current) => ({
-                    ...current,
-                    activeSkillId: skill.id,
-                  }));
-                  setView("practice");
-                  setSelectedRealmId(stats.currentRealm?.id ?? "");
-                  setSelectedLayerId(stats.currentLayer?.id ?? "");
-                }}
+                className={`profile-card ${
+                  skill.id === activeSkill.id ? "active" : ""
+                }`}
               >
                 <span
                   className="skill-mark"
@@ -1461,24 +2014,129 @@ export function CultivationApp() {
                     层数 {stats.completedLayers}/{stats.totalLayers}
                   </span>
                 </div>
-              </button>
+                <ActivityGrid skill={skill} />
+                <div className="profile-actions">
+                  <button
+                    className="jump-button"
+                    onClick={() => {
+                      setState((current) => ({
+                        ...current,
+                        activeSkillId: skill.id,
+                      }));
+                      setView("practice");
+                      setSelectedRealmId(stats.currentRealm?.id ?? "");
+                      setSelectedLayerId(stats.currentLayer?.id ?? "");
+                    }}
+                  >
+                    入道
+                  </button>
+                  <button
+                    className="danger-button subtle"
+                    onClick={() => deleteSkill(skill.id)}
+                    disabled={state.skills.length <= 1}
+                  >
+                    删除此道
+                  </button>
+                </div>
+              </article>
             ))}
           </div>
         </section>
       ) : null}
 
       {view === "prompt" ? (
-        <section className="prompt-page" aria-label="配置生成提示词">
+        <section className="prompt-page" aria-label="道册与道法导入">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">配置生成</p>
-              <h2>生成可导入配置</h2>
+              <p className="eyebrow">道册</p>
+              <h2>修行道册</h2>
             </div>
             <button className="primary-button" onClick={copyPrompt}>
-              复制配置提示词
+              刻录道法引
             </button>
           </div>
-          <textarea readOnly value={AI_IMPORT_PROMPT} />
+
+          <div className="guide-grid">
+            <section className="guide-section">
+              <h3>此册何用</h3>
+              <p>
+                它把一条长期能力称作“一道”。每一道都有独立的境界路线、
+                每境十层、每层任务进度、每日道历打卡，以及自己的主题颜色。
+                你可以同时修多条道，并在修为总览里看所有道目前走到哪里。
+              </p>
+            </section>
+
+            <section className="guide-section">
+              <h3>存档之法</h3>
+              <p>
+                页面会一直自动保存到浏览器的 localStorage。选择本地文件夹后，
+                应用还会把同一份完整存档写成
+                <strong>{PROGRESS_FILE_NAME}</strong>，之后每次推进进度都会自动同步。
+              </p>
+              <p>
+                区别是：localStorage 只在当前浏览器和当前站点里可用；本地文件夹保存会生成你能看见、
+                备份、迁移的 JSON 文件。
+              </p>
+            </section>
+
+            <section className="guide-section">
+              <h3>入档之法</h3>
+              <p>
+                “导入存档”可以读取完整 source of truth JSON。完整存档包含所有道、
+                境界、层级、任务、当前进度、每日道历、保存文件名、上次本地文件夹名等存档元信息。检测到完整存档时，
+                应用会询问是覆盖当前全部道途，还是合并导入。
+              </p>
+              <p>
+                浏览器安全限制下，JSON 不能自动恢复本地文件夹写入权限；存档会记录上次连接的文件夹名称，
+                但导入后如果要继续同步到本地文件夹，需要重新点“选择本地文件夹”授权。
+              </p>
+            </section>
+
+            <section className="guide-section">
+              <h3>道法导入怎么用</h3>
+              <p>
+                先在“道法导入”里选境界路线，再用“刻录”复制本页“道法引”发给 AI。
+                AI 会先让你填写“我想学”和“我眼中的顶级状态”。
+                你填完后，剩下的境界、十层、每层任务都交给道法引和 AI agent 推演。
+              </p>
+              <p>
+                AI 返回的是一整条道法 JSON，粘贴到“道法导入”后点“导入道法”，就会直接新建这一道。
+                道法导入不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
+                完整 source of truth 仍然用顶部的“导入存档”恢复。
+              </p>
+            </section>
+          </div>
+
+          <div className={`prompt-vault ${promptVaultOpen ? "open" : ""}`}>
+            <div className="prompt-vault-head">
+              <button
+                type="button"
+                className="prompt-toggle-button"
+                aria-expanded={promptVaultOpen}
+                onClick={() => setPromptVaultOpen((open) => !open)}
+              >
+                <span>道法引</span>
+                <b>
+                  {promptVaultOpen ? "收起完整生成提示词" : "展开完整生成提示词"}
+                </b>
+              </button>
+              <button
+                type="button"
+                className="prompt-copy-button"
+                onClick={copyPrompt}
+              >
+                刻录
+              </button>
+            </div>
+            {promptVaultOpen ? (
+              <textarea
+                className="prompt-textarea"
+                readOnly
+                rows={10}
+                value={currentDaoSchemaPrompt}
+              />
+            ) : null}
+          </div>
         </section>
       ) : null}
 
@@ -1554,13 +2212,6 @@ export function CultivationApp() {
                   }
                 />
               </label>
-              <button
-                className="danger-button"
-                onClick={deleteActiveSkill}
-                disabled={state.skills.length <= 1}
-              >
-                删除此道
-              </button>
             </div>
 
             <div className="stats-grid">
@@ -1656,6 +2307,7 @@ export function CultivationApp() {
                   </div>
                   <textarea
                     className="realm-summary"
+                    placeholder="写下此境界的目标、要求或修行纲领"
                     value={selectedRealm.summary}
                     onChange={(event) =>
                       updateRealm(selectedRealm.id, {
@@ -1707,8 +2359,9 @@ export function CultivationApp() {
                       <p className="eyebrow">
                         {selectedRealm.name} · 第{selectedLayer.number}层
                       </p>
-                      <input
+                      <textarea
                         className="layer-title-input"
+                        rows={2}
                         value={selectedLayer.title}
                         onChange={(event) =>
                           updateLayer(selectedRealm.id, selectedLayer.id, {
