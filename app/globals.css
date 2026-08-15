@@ -812,8 +812,9 @@ h3 {
 
 .profile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 360px));
   gap: 12px;
+  justify-content: start;
 }
 
 .profile-card {
@@ -822,6 +823,7 @@ h3 {
   grid-template-columns: 14px minmax(0, 1fr);
   gap: 10px 12px;
   align-items: start;
+  width: 100%;
   min-height: 230px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2138,6 +2140,10 @@ h3 {
   }
 
   .command-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-grid {
     grid-template-columns: 1fr;
   }
 
