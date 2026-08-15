@@ -435,6 +435,36 @@ h3 {
   gap: 10px;
 }
 
+.realm-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(300px, 430px);
+  gap: 8px;
+  align-items: end;
+  justify-content: end;
+  width: min(100%, 730px);
+}
+
+.realm-tools .inline-form {
+  width: 100%;
+}
+
+.preset-switcher select {
+  border-color: rgba(198, 171, 112, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 236, 0.95), rgba(241, 231, 207, 0.9)),
+    #f4ead2;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 6px 12px rgba(94, 73, 35, 0.05);
+}
+
+.preset-switcher select:focus {
+  border-color: rgba(158, 110, 35, 0.74);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 244, 0.98), rgba(244, 232, 204, 0.94)),
+    #f7edd4;
+}
+
 .inline-form {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 82px;
@@ -2087,6 +2117,7 @@ h3 {
   }
 
   .command-actions,
+  .realm-tools,
   .inline-form,
   .cultivation-pager,
   .guide-grid,

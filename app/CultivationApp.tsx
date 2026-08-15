@@ -149,7 +149,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PRESETS: Preset[] = [
   {
     id: "fanren",
-    name: "凡人修仙传路线",
+    name: "凡人修仙传境界路线",
     realms: [
       "炼气",
       "筑基",
@@ -215,9 +215,27 @@ const PRESETS: Preset[] = [
 ];
 
 const SELECTABLE_PRESETS = PRESETS.filter((preset) => preset.selectable !== false);
+const CUSTOM_PRESET_ID = "custom";
+const LEGACY_PRESET_IDS_BY_NAME: Record<string, string> = {
+  凡人修仙传路线: "fanren",
+};
 
 function presetOptionLabel(preset: Preset) {
   return `${preset.name}（共${preset.realms.length}境界）`;
+}
+
+function presetMatchesRealms(skill: Skill, preset: Preset) {
+  return (
+    skill.realms.length === preset.realms.length &&
+    skill.realms.every((realm, index) => realm.name === preset.realms[index])
+  );
+}
+
+function selectedPresetIdForSkill(skill: Skill) {
+  return (
+    SELECTABLE_PRESETS.find((preset) => presetMatchesRealms(skill, preset))?.id ??
+    CUSTOM_PRESET_ID
+  );
 }
 
 function daoSchemaPrompt(preset: Preset) {
@@ -791,9 +809,23 @@ function normalizeActivityDay(value: unknown): ActivityDay | undefined {
 
 function normalizeSkill(value: unknown, index: number): Skill {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const rawPresetName = readString(raw.presetName, "");
+  const rawPresetId = readString(raw.presetId, "");
+  const legacyPresetId = LEGACY_PRESET_IDS_BY_NAME[rawPresetName];
   const preset =
-    PRESETS.find((item) => item.name === raw.presetName || item.id === raw.presetId) ??
+    PRESETS.find(
+      (item) =>
+        item.name === rawPresetName ||
+        item.id === rawPresetId ||
+        item.id === legacyPresetId,
+    ) ??
     PRESETS[0];
+  const presetName =
+    rawPresetName === "自定义路线"
+      ? rawPresetName
+      : legacyPresetId || rawPresetId || PRESETS.some((item) => item.name === rawPresetName)
+        ? preset.name
+        : readString(raw.presetName, preset.name);
   const rawRealms = Array.isArray(raw.realms) ? raw.realms : [];
   const realms =
     rawRealms.length > 0
@@ -807,7 +839,7 @@ function normalizeSkill(value: unknown, index: number): Skill {
     name: readString(raw.name, `道 ${index + 1}`),
     description: readString(raw.description, "自定义这条道的修炼目标。"),
     color: readString(raw.color, COLORS[index % COLORS.length]),
-    presetName: readString(raw.presetName, preset.name),
+    presetName,
     realms,
     activity: Array.isArray(raw.activity)
       ? raw.activity
@@ -1146,6 +1178,9 @@ export function CultivationApp() {
     selectedRealm?.layers.find((layer) => layer.id === selectedLayerId) ??
     activeStats?.currentLayer ??
     selectedRealm?.layers[0];
+  const activePresetId = activeSkill
+    ? selectedPresetIdForSkill(activeSkill)
+    : CUSTOM_PRESET_ID;
   const selectedRealmStats = selectedRealm ? realmStats(selectedRealm) : undefined;
   const selectedLayerStats = selectedLayer ? layerStats(selectedLayer) : undefined;
   const selectedLayerUnlocked =
@@ -1351,9 +1386,65 @@ export function CultivationApp() {
     );
   }
 
+  function applyPresetToActiveSkill(presetId: string) {
+    if (!activeSkill || presetId === CUSTOM_PRESET_ID) {
+      return;
+    }
+    const preset = SELECTABLE_PRESETS.find((item) => item.id === presetId);
+    if (!preset || selectedPresetIdForSkill(activeSkill) === preset.id) {
+      updateActiveSkill((skill) => ({ ...skill, presetName: preset?.name ?? skill.presetName }));
+      return;
+    }
+    const removedCount = activeSkill.realms.length - preset.realms.length;
+    if (removedCount > 0) {
+      const confirmed = window.confirm(
+        `切换为“${preset.name}”会移除后面 ${removedCount} 个境界，以及其中的层级、任务和进度。确定继续？`,
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const previousRealmIndex = Math.max(
+      0,
+      activeSkill.realms.findIndex((realm) => realm.id === selectedRealm?.id),
+    );
+    const previousLayerIndex = Math.max(
+      0,
+      selectedRealm?.layers.findIndex((layer) => layer.id === selectedLayer?.id) ?? 0,
+    );
+    const realms = preset.realms.map((realmName, index) => {
+      const existingRealm = activeSkill.realms[index];
+      return existingRealm
+        ? { ...existingRealm, name: realmName }
+        : makeRealm(activeSkill.id, realmName, index, {
+            id: uid("realm"),
+            name: realmName,
+          });
+    });
+    const nextRealmIndex = Math.min(previousRealmIndex, realms.length - 1);
+    const nextRealm = realms[nextRealmIndex];
+    const nextLayerIndex = Math.min(
+      previousLayerIndex,
+      Math.max(0, (nextRealm?.layers.length ?? 1) - 1),
+    );
+
+    updateActiveSkill((skill) => ({
+      ...skill,
+      presetName: preset.name,
+      realms,
+    }));
+    setSelectedRealmId(nextRealm?.id ?? "");
+    setSelectedLayerId(nextRealm?.layers[nextLayerIndex]?.id ?? "");
+    setStatus(`已套用${preset.name}，原有层级任务已按位置保留`);
+  }
+
   function updateRealm(realmId: string, patch: Partial<Realm>) {
     updateActiveSkill((skill) => ({
       ...skill,
+      presetName: Object.prototype.hasOwnProperty.call(patch, "name")
+        ? "自定义路线"
+        : skill.presetName,
       realms: skill.realms.map((realm) =>
         realm.id === realmId ? { ...realm, ...patch } : realm,
       ),
@@ -2281,13 +2372,33 @@ export function CultivationApp() {
                   <p className="eyebrow">{activeSkill.presetName}</p>
                   <h2>境界路线</h2>
                 </div>
-                <div className="inline-form">
-                  <input
-                    value={newRealmName}
-                    onChange={(event) => setNewRealmName(event.target.value)}
-                    placeholder="新增境界名"
-                  />
-                  <button onClick={addRealm}>添加</button>
+                <div className="realm-tools">
+                  <label className="preset-switcher">
+                    套用预设
+                    <select
+                      value={activePresetId}
+                      onChange={(event) =>
+                        applyPresetToActiveSkill(event.target.value)
+                      }
+                    >
+                      <option value={CUSTOM_PRESET_ID} disabled>
+                        自定义路线
+                      </option>
+                      {SELECTABLE_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {presetOptionLabel(preset)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="inline-form">
+                    <input
+                      value={newRealmName}
+                      onChange={(event) => setNewRealmName(event.target.value)}
+                      placeholder="新增境界名"
+                    />
+                    <button onClick={addRealm}>添加</button>
+                  </div>
                 </div>
               </div>
               <div className="realm-list">
