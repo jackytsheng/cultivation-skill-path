@@ -229,7 +229,7 @@ function daoSchemaPrompt(preset: Preset) {
 我想学：
 我眼中的顶级状态：
 
-2. 如果用户已经提供了“我想学”和“我眼中的顶级状态”，请不要继续追问，直接生成完整道法 JSON。
+2. 如果用户已经提供了“我想学”和“我眼中的顶级状态”，请不要继续追问，直接生成完整道法 JSON 文件。
 3. 如果用户额外提供了当前水平、每周投入时间、偏好的任务强度或希望境界数量，就纳入规划；如果没提供，请自行做合理假设。
 
 生成任务：
@@ -242,11 +242,11 @@ function daoSchemaPrompt(preset: Preset) {
 7. 任务难度要随层数递进：前期重基础和稳定，中期重综合和应用，后期重创作、实战、风格、长期稳定性。
 
 交付方式（最重要）：
-1. 首选：如果你所在环境支持创建文件或附件，请直接生成一个可下载的 UTF-8 JSON 文件，不要把 JSON 散贴在聊天正文里。
+1. 必须生成一个可下载的 UTF-8 JSON 文件，不要把 JSON 散贴在聊天正文里。
 2. 文件名使用 dao-${preset.id}.json；如果能根据用户想学的内容生成更清晰的英文或拼音短名，也可以使用 dao-能力名.json。
 3. 文件内容必须是一个完整、合法、可直接导入网页的单条“道法 JSON”。不要拆成多个文件，不要分多条消息逐段输出，不要按境界分批生成。
 4. 生成文件后，聊天正文只需要简短说明“已生成可导入的道法 JSON 文件”，不要再重复粘贴完整 JSON。
-5. 如果你的环境完全不能创建下载文件，才退而求其次：在一条消息里输出完整 JSON 对象；不要 Markdown，不要解释，不要代码块，不要分段。
+5. 如果你所在环境暂时无法创建附件，请明确告诉用户换用支持文件生成的 AI 工具；不要改成让用户手动复制 JSON。
 
 生成 JSON 时的导入规则：
 1. 这是单条“道法 JSON”，不是完整存档；不要输出 version、skills、storage、activity、id、createdAt、updatedAt。
@@ -1121,7 +1121,6 @@ export function CultivationApp() {
   const [daoImportPreset, setDaoImportPreset] = useState(
     SELECTABLE_PRESETS[0]?.id ?? PRESETS[0].id,
   );
-  const [daoImportText, setDaoImportText] = useState("");
   const [promptVaultOpen, setPromptVaultOpen] = useState(false);
   const [selectedRealmId, setSelectedRealmId] = useState("");
   const [selectedLayerId, setSelectedLayerId] = useState("");
@@ -1688,21 +1687,8 @@ export function CultivationApp() {
     }));
     setSelectedRealmId(skill.realms[0]?.id ?? "");
     setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
-    setDaoImportText("");
     setStatus(`道法“${skill.name}”已导入`);
     setView("practice");
-  }
-
-  function importDaoSchema() {
-    if (!daoImportText.trim()) {
-      setStatus("请先粘贴道法 JSON，或选择 AI 生成的道法秘籍");
-      return;
-    }
-    try {
-      addDaoFromSchema(JSON.parse(daoImportText) as unknown);
-    } catch (error) {
-      setStatus((error as Error).message || "道法导入失败");
-    }
   }
 
   async function importDaoSchemaFile(file: File) {
@@ -1720,7 +1706,7 @@ export function CultivationApp() {
           multiple: false,
           types: [
             {
-              description: "道法 JSON",
+              description: "道法秘籍",
               accept: { "application/json": [".json"] },
             },
           ],
@@ -2025,22 +2011,9 @@ export function CultivationApp() {
                 <button className="jump-button" onClick={copyPrompt}>
                   刻录道法引
                 </button>
-                <label>
-                  道法 JSON
-                  <textarea
-                    value={daoImportText}
-                    onChange={(event) => setDaoImportText(event.target.value)}
-                    placeholder="粘贴 AI 返回的整条道法 JSON"
-                  />
-                </label>
-                <div className="dao-import-actions">
-                  <button className="jump-button" onClick={selectDaoSchemaFile}>
-                    选择道法秘籍
-                  </button>
-                  <button className="primary-button" onClick={importDaoSchema}>
-                    导入道法文本
-                  </button>
-                </div>
+                <button className="primary-button" onClick={selectDaoSchemaFile}>
+                  选择道法秘籍
+                </button>
               </div>
             </div>
           </div>
@@ -2164,8 +2137,7 @@ export function CultivationApp() {
                 你填完后，剩下的境界、十层、每层任务都交给道法引和 AI agent 推演。
               </p>
               <p>
-                道法引会优先要求 AI 生成可下载的 .json 文件；下载后点“选择道法秘籍”即可导入。
-                如果 AI 所在环境不能生成文件，也可以把它返回的一整条道法 JSON 粘贴到“道法导入”后点“导入道法文本”。
+                道法引会要求 AI 生成可下载的 .json 秘籍文件；下载后点“选择道法秘籍”即可导入。
                 道法导入不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
                 完整 source of truth 仍然用顶部的“导入存档”恢复。
               </p>
