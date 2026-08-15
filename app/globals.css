@@ -1543,8 +1543,13 @@ h3 {
   top: var(--path-node-y);
   height: 3px;
   transform: translateY(-50%);
-  background: linear-gradient(90deg, #c89d45 65%, #ddd4c2 65%);
+  background: linear-gradient(
+    90deg,
+    #c89d45 0 var(--layer-path-progress, 0%),
+    #ddd4c2 var(--layer-path-progress, 0%) 100%
+  );
   pointer-events: none;
+  transition: background 180ms ease;
 }
 
 .path-node {

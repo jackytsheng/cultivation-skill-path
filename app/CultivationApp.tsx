@@ -487,6 +487,23 @@ function layerStats(layer: Layer): TaskStats {
   };
 }
 
+function layerPathProgressPercent(layers: Layer[]) {
+  if (layers.length === 0) {
+    return 0;
+  }
+  const completedLayers = layers.filter((layer) => layerStats(layer).complete).length;
+  if (completedLayers === 0) {
+    return 0;
+  }
+  if (layers.length === 1) {
+    return 100;
+  }
+  return Math.min(
+    100,
+    Math.round(((completedLayers - 1) / (layers.length - 1)) * 1000) / 10,
+  );
+}
+
 function skillStats(skill: Skill): SkillStats {
   const layers = skill.realms.flatMap((realm) =>
     realm.layers.map((layer) => ({ realm, layer, stats: layerStats(layer) })),
@@ -1194,6 +1211,9 @@ export function CultivationApp() {
     : CUSTOM_PRESET_ID;
   const selectedRealmStats = selectedRealm ? realmStats(selectedRealm) : undefined;
   const selectedLayerStats = selectedLayer ? layerStats(selectedLayer) : undefined;
+  const selectedLayerPathProgress = selectedRealm
+    ? layerPathProgressPercent(selectedRealm.layers)
+    : 0;
   const selectedLayerUnlocked =
     activeSkill && selectedRealm && selectedLayer
       ? canAdvanceLayer(activeSkill, selectedRealm.id, selectedLayer.id)
@@ -1944,7 +1964,14 @@ export function CultivationApp() {
               <b>{selectedRealmStats?.percent ?? 0}%</b>
             </div>
           ) : null}
-          <div className="layer-path">
+          <div
+            className="layer-path"
+            style={
+              {
+                "--layer-path-progress": `${selectedLayerPathProgress}%`,
+              } as CSSProperties
+            }
+          >
             {selectedRealm?.layers.map((layer) => {
               const stats = layerStats(layer);
               const unlocked = canAdvanceLayer(activeSkill, selectedRealm.id, layer.id);
