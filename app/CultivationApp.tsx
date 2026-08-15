@@ -1695,7 +1695,7 @@ export function CultivationApp() {
 
   function importDaoSchema() {
     if (!daoImportText.trim()) {
-      setStatus("请先粘贴道法 JSON，或选择 AI 生成的道法文件");
+      setStatus("请先粘贴道法 JSON，或选择 AI 生成的道法秘籍");
       return;
     }
     try {
@@ -1709,7 +1709,7 @@ export function CultivationApp() {
     try {
       addDaoFromSchema(JSON.parse(await file.text()) as unknown);
     } catch (error) {
-      setStatus((error as Error).message || "道法文件导入失败");
+      setStatus((error as Error).message || "道法秘籍导入失败");
     }
   }
 
@@ -2035,7 +2035,7 @@ export function CultivationApp() {
                 </label>
                 <div className="dao-import-actions">
                   <button className="jump-button" onClick={selectDaoSchemaFile}>
-                    选择道法文件
+                    选择道法秘籍
                   </button>
                   <button className="primary-button" onClick={importDaoSchema}>
                     导入道法文本
@@ -2164,7 +2164,7 @@ export function CultivationApp() {
                 你填完后，剩下的境界、十层、每层任务都交给道法引和 AI agent 推演。
               </p>
               <p>
-                道法引会优先要求 AI 生成可下载的 .json 文件；下载后点“选择道法文件”即可导入。
+                道法引会优先要求 AI 生成可下载的 .json 文件；下载后点“选择道法秘籍”即可导入。
                 如果 AI 所在环境不能生成文件，也可以把它返回的一整条道法 JSON 粘贴到“道法导入”后点“导入道法文本”。
                 道法导入不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
                 完整 source of truth 仍然用顶部的“导入存档”恢复。
