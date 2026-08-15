@@ -160,7 +160,7 @@ const PRESETS: Preset[] = [
       "炼虚",
       "合体",
       "大乘",
-      "飞升/真仙",
+      "飞升境",
       "金仙",
       "太乙",
       "大罗",
@@ -220,6 +220,9 @@ const CUSTOM_PRESET_ID = "custom";
 const LEGACY_PRESET_IDS_BY_NAME: Record<string, string> = {
   凡人修仙传路线: "fanren",
 };
+const LEGACY_REALM_NAMES: Record<string, string> = {
+  "飞升/真仙": "飞升境",
+};
 
 function presetOptionLabel(preset: Preset) {
   return `${preset.name}（共${preset.realms.length}境界）`;
@@ -237,6 +240,10 @@ function selectedPresetIdForSkill(skill: Skill) {
     SELECTABLE_PRESETS.find((preset) => presetMatchesRealms(skill, preset))?.id ??
     CUSTOM_PRESET_ID
   );
+}
+
+function displayRealmName(name: string) {
+  return LEGACY_REALM_NAMES[name] ?? name;
 }
 
 function daoSchemaPrompt(preset: Preset) {
@@ -715,7 +722,7 @@ function normalizeLayer(value: unknown, index: number, realmName: string): Layer
 
 function normalizeRealm(value: unknown, index: number): Realm {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const name = readString(raw.name, `自定义境界 ${index + 1}`);
+  const name = displayRealmName(readString(raw.name, `自定义境界 ${index + 1}`));
   const rawLayers = Array.isArray(raw.layers) ? raw.layers : [];
   return {
     id: readString(raw.id, uid("realm")),
