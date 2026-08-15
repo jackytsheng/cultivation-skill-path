@@ -901,13 +901,14 @@ function normalizeImport(value: unknown): AppState {
       ? value
       : [value];
   const skills = incomingSkills.map((skill, index) => normalizeSkill(skill, index));
-  if (skills.length === 0) {
-    throw new Error("JSON 里没有可导入的 skills。");
-  }
+  const requestedActiveSkillId = readString(raw.activeSkillId, skills[0]?.id ?? "");
+  const activeSkillId = skills.some((skill) => skill.id === requestedActiveSkillId)
+    ? requestedActiveSkillId
+    : skills[0]?.id ?? "";
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
-    activeSkillId: readString(raw.activeSkillId, skills[0].id),
+    activeSkillId,
     storage: normalizeStorage(raw.storage),
     skills,
   };
@@ -1193,6 +1194,7 @@ export function CultivationApp() {
   const [folderName, setFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const daoFileInputRef = useRef<HTMLInputElement>(null);
+  const newSkillNameRef = useRef<HTMLInputElement>(null);
 
   const activeSkill =
     state.skills.find((skill) => skill.id === state.activeSkillId) ??
@@ -1376,6 +1378,11 @@ export function CultivationApp() {
     setManualRealmPage(null);
   }
 
+  function focusNewDaoForm() {
+    setView("profile");
+    window.setTimeout(() => newSkillNameRef.current?.focus(), 0);
+  }
+
   function addSkill() {
     const preset =
       SELECTABLE_PRESETS.find((item) => item.id === newSkillPreset) ??
@@ -1400,9 +1407,6 @@ export function CultivationApp() {
   }
 
   function deleteSkill(skillId: string) {
-    if (state.skills.length <= 1) {
-      return;
-    }
     const targetSkill = state.skills.find((skill) => skill.id === skillId);
     if (!targetSkill) {
       return;
@@ -1433,10 +1437,14 @@ export function CultivationApp() {
         nextActiveSkill?.realms[0]?.id ?? "",
         nextActiveSkill?.realms[0]?.layers[0]?.id ?? "",
       );
+      if (!nextActiveSkill) {
+        setView("profile");
+      }
     }
     setSkillPage((page) =>
       Math.min(page, Math.max(0, Math.ceil(nextSkills.length / SKILLS_PER_PAGE) - 1)),
     );
+    setStatus(`已删除此道“${targetSkill.name}”`);
   }
 
   function applyPresetToActiveSkill(presetId: string) {
@@ -1872,10 +1880,6 @@ export function CultivationApp() {
     event.target.value = "";
   }
 
-  if (!activeSkill || !activeStats) {
-    return null;
-  }
-
   return (
     <main className="app-shell">
       <header className="hero-grid">
@@ -1887,14 +1891,25 @@ export function CultivationApp() {
               <span />
             </div>
             <p className="brand-subtitle">
-              {activeSkill.name} <span>·</span> 修炼功法
+              {activeSkill ? (
+                <>
+                  {activeSkill.name} <span>·</span> 修炼功法
+                </>
+              ) : (
+                <>
+                  档案暂空 <span>·</span> 待开新道
+                </>
+              )}
             </p>
             <p className="brand-meta">
-              {activeSkill.description.trim() || "此道目标尚未填写"}
+              {activeSkill
+                ? activeSkill.description.trim() || "此道目标尚未填写"
+                : "从修为总览开辟新道，或导入一份道法秘籍。"}
             </p>
           </div>
         </section>
 
+        {activeSkill && activeStats ? (
         <section className="realm-card" aria-label="境界进度">
           <div className="realm-card-head">
             <PanelHeading title="境界" />
@@ -1996,6 +2011,25 @@ export function CultivationApp() {
             })}
           </div>
         </section>
+        ) : (
+          <section className="realm-card empty-realm-card" aria-label="境界进度">
+            <div className="realm-card-head">
+              <PanelHeading title="境界" />
+              <div className="realm-pager" aria-label="境界分页">
+                <b>0 / 共 0 境</b>
+              </div>
+            </div>
+            <div className="empty-orbit" aria-hidden="true">
+              {Array.from({ length: 10 }, (_, index) => (
+                <span key={index} />
+              ))}
+            </div>
+            <div className="empty-dao-note">
+              <strong>尚未开辟任何道</strong>
+              <p>删空后档案会保留，重新开辟新道或导入道法秘籍即可继续。</p>
+            </div>
+          </section>
+        )}
       </header>
 
       <section className="command-strip" aria-label="保存与导入">
@@ -2074,7 +2108,7 @@ export function CultivationApp() {
                   <button
                     key={skill.id}
                     className={`cultivation-row ${
-                      skill.id === activeSkill.id ? "active" : ""
+                      skill.id === activeSkill?.id ? "active" : ""
                     }`}
                     onClick={() => {
                       setState((current) => ({
@@ -2101,6 +2135,12 @@ export function CultivationApp() {
                     </b>
                   </button>
                 ))}
+                {visibleProfileStats.length === 0 ? (
+                  <div className="cultivation-empty">
+                    <strong>诸道暂空</strong>
+                    <span>右侧可手动开辟新道，也可以导入道法秘籍。</span>
+                  </div>
+                ) : null}
               </div>
               <div className="cultivation-pager" aria-label="诸道修行分页">
                 <button
@@ -2132,6 +2172,7 @@ export function CultivationApp() {
                     <label>
                       新开一道
                       <input
+                        ref={newSkillNameRef}
                         value={newSkillName}
                         onChange={(event) => setNewSkillName(event.target.value)}
                         placeholder="比如 鼓道、剑道、英语口语"
@@ -2201,7 +2242,7 @@ export function CultivationApp() {
               <article
                 key={skill.id}
                 className={`profile-card ${
-                  skill.id === activeSkill.id ? "active" : ""
+                  skill.id === activeSkill?.id ? "active" : ""
                 }`}
               >
                 <span
@@ -2245,13 +2286,33 @@ export function CultivationApp() {
                   <button
                     className="danger-button subtle"
                     onClick={() => deleteSkill(skill.id)}
-                    disabled={state.skills.length <= 1}
                   >
                     删除此道
                   </button>
                 </div>
               </article>
             ))}
+            {visibleProfileStats.length === 0 ? (
+              <article className="profile-card empty-profile-card">
+                <span className="skill-mark" aria-hidden="true" />
+                <div>
+                  <h3>此档尚无道</h3>
+                  <p>开辟新道后，这里会显示境界、层数进度和道历打卡。</p>
+                </div>
+                <div className="profile-current">
+                  <strong>待入第一道</strong>
+                  <span>可从上方“开辟新道”或“道法秘籍”开始。</span>
+                </div>
+                <div className="empty-actions">
+                  <button className="primary-button" onClick={focusNewDaoForm}>
+                    开辟新道
+                  </button>
+                  <button className="jump-button" onClick={selectDaoSchemaFile}>
+                    选择道法秘籍
+                  </button>
+                </div>
+              </article>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -2352,7 +2413,7 @@ export function CultivationApp() {
         </section>
       ) : null}
 
-      {view === "practice" ? (
+      {view === "practice" ? activeSkill && activeStats ? (
         <>
           <section className="dashboard-panels practice-dashboard" aria-label="当前道任务总览">
             <div className="task-summary-panel">
@@ -2755,6 +2816,24 @@ export function CultivationApp() {
           </section>
           </section>
         </>
+      ) : (
+        <section className="empty-dao-panel practice-empty" aria-label="空档案">
+          <PanelHeading title="档案暂空" tone="gold" />
+          <div>
+            <h2>此档尚未开辟任何道</h2>
+            <p>
+              可以先开辟一条新道，或导入 AI 生成的道法秘籍；导入完整存档也会恢复所有道和进度。
+            </p>
+          </div>
+          <div className="empty-actions">
+            <button className="primary-button" onClick={focusNewDaoForm}>
+              去开辟新道
+            </button>
+            <button className="jump-button" onClick={selectDaoSchemaFile}>
+              选择道法秘籍
+            </button>
+          </div>
+        </section>
       ) : null}
     </main>
   );
