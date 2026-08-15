@@ -241,9 +241,16 @@ function daoSchemaPrompt(preset: Preset) {
 6. 任务颗粒度默认每层 3 到 5 个任务；如果用户特别说明，可以调整。
 7. 任务难度要随层数递进：前期重基础和稳定，中期重综合和应用，后期重创作、实战、风格、长期稳定性。
 
+交付方式（最重要）：
+1. 首选：如果你所在环境支持创建文件或附件，请直接生成一个可下载的 UTF-8 JSON 文件，不要把 JSON 散贴在聊天正文里。
+2. 文件名使用 dao-${preset.id}.json；如果能根据用户想学的内容生成更清晰的英文或拼音短名，也可以使用 dao-能力名.json。
+3. 文件内容必须是一个完整、合法、可直接导入网页的单条“道法 JSON”。不要拆成多个文件，不要分多条消息逐段输出，不要按境界分批生成。
+4. 生成文件后，聊天正文只需要简短说明“已生成可导入的道法 JSON 文件”，不要再重复粘贴完整 JSON。
+5. 如果你的环境完全不能创建下载文件，才退而求其次：在一条消息里输出完整 JSON 对象；不要 Markdown，不要解释，不要代码块，不要分段。
+
 生成 JSON 时的导入规则：
-1. 只返回合法 JSON，不要 Markdown，不要解释，不要代码块。
-2. 这是单条“道法 JSON”，不是完整存档；不要输出 version、skills、storage、activity、id、createdAt、updatedAt。
+1. 这是单条“道法 JSON”，不是完整存档；不要输出 version、skills、storage、activity、id、createdAt、updatedAt。
+2. JSON 顶层必须只有 name、description、color、realms 这些导入字段。
 3. 当前选择的预设路线是：${preset.name}（共${preset.realms.length}境界）。
 4. 网页导入时会按这个预设路线给境界命名：${preset.realms.join(" → ")}。
 5. 你不需要输出 realm.name；每个 realm 只写 summary 和 layers。
@@ -276,7 +283,7 @@ function daoSchemaPrompt(preset: Preset) {
   ]
 }
 
-现在开始执行本“道法引”：如果用户还没给出“我想学”和“我眼中的顶级状态”，先索取这两项；如果已经给出，就直接输出可导入 JSON。`;
+现在开始执行本“道法引”：如果用户还没给出“我想学”和“我眼中的顶级状态”，先索取这两项；如果已经给出，就直接生成可下载的道法 JSON 文件。`;
 }
 
 function makeLayer(
@@ -1126,6 +1133,7 @@ export function CultivationApp() {
     useState<FileSystemDirectoryHandleLike | null>(null);
   const [folderName, setFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const daoFileInputRef = useRef<HTMLInputElement>(null);
 
   const activeSkill =
     state.skills.find((skill) => skill.id === state.activeSkillId) ??
@@ -1667,31 +1675,75 @@ export function CultivationApp() {
     setStatus("道法引已刻录");
   }
 
+  function addDaoFromSchema(parsed: unknown) {
+    const skill = normalizeDaoSchemaSkill(
+      parsed,
+      selectedDaoImportPreset,
+      state.skills.length,
+    );
+    updateState((current) => ({
+      ...current,
+      activeSkillId: skill.id,
+      skills: [...current.skills, skill],
+    }));
+    setSelectedRealmId(skill.realms[0]?.id ?? "");
+    setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
+    setDaoImportText("");
+    setStatus(`道法“${skill.name}”已导入`);
+    setView("practice");
+  }
+
   function importDaoSchema() {
     if (!daoImportText.trim()) {
-      setStatus("请先粘贴道法 JSON");
+      setStatus("请先粘贴道法 JSON，或选择 AI 生成的道法文件");
       return;
     }
     try {
-      const parsed = JSON.parse(daoImportText) as unknown;
-      const skill = normalizeDaoSchemaSkill(
-        parsed,
-        selectedDaoImportPreset,
-        state.skills.length,
-      );
-      updateState((current) => ({
-        ...current,
-        activeSkillId: skill.id,
-        skills: [...current.skills, skill],
-      }));
-      setSelectedRealmId(skill.realms[0]?.id ?? "");
-      setSelectedLayerId(skill.realms[0]?.layers[0]?.id ?? "");
-      setDaoImportText("");
-      setStatus(`道法“${skill.name}”已导入`);
-      setView("practice");
+      addDaoFromSchema(JSON.parse(daoImportText) as unknown);
     } catch (error) {
       setStatus((error as Error).message || "道法导入失败");
     }
+  }
+
+  async function importDaoSchemaFile(file: File) {
+    try {
+      addDaoFromSchema(JSON.parse(await file.text()) as unknown);
+    } catch (error) {
+      setStatus((error as Error).message || "道法文件导入失败");
+    }
+  }
+
+  async function selectDaoSchemaFile() {
+    if (window.showOpenFilePicker) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          multiple: false,
+          types: [
+            {
+              description: "道法 JSON",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+        if (handle) {
+          await importDaoSchemaFile(await handle.getFile());
+        }
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+      }
+    }
+    daoFileInputRef.current?.click();
+  }
+
+  function handleDaoFileInput(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) {
+      void importDaoSchemaFile(file);
+    }
+    event.target.value = "";
   }
 
   if (!activeSkill || !activeStats) {
@@ -1836,6 +1888,13 @@ export function CultivationApp() {
           accept="application/json,.json"
           onChange={handleFileInput}
         />
+        <input
+          ref={daoFileInputRef}
+          className="hidden-input"
+          type="file"
+          accept="application/json,.json"
+          onChange={handleDaoFileInput}
+        />
       </section>
 
       {view === "profile" ? (
@@ -1974,9 +2033,14 @@ export function CultivationApp() {
                     placeholder="粘贴 AI 返回的整条道法 JSON"
                   />
                 </label>
-                <button className="primary-button" onClick={importDaoSchema}>
-                  导入道法
-                </button>
+                <div className="dao-import-actions">
+                  <button className="jump-button" onClick={selectDaoSchemaFile}>
+                    选择道法文件
+                  </button>
+                  <button className="primary-button" onClick={importDaoSchema}>
+                    导入道法文本
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2100,7 +2164,8 @@ export function CultivationApp() {
                 你填完后，剩下的境界、十层、每层任务都交给道法引和 AI agent 推演。
               </p>
               <p>
-                AI 返回的是一整条道法 JSON，粘贴到“道法导入”后点“导入道法”，就会直接新建这一道。
+                道法引会优先要求 AI 生成可下载的 .json 文件；下载后点“选择道法文件”即可导入。
+                如果 AI 所在环境不能生成文件，也可以把它返回的一整条道法 JSON 粘贴到“道法导入”后点“导入道法文本”。
                 道法导入不是完整存档导入；它只包含道名、目标、境界、十层和每层任务。
                 完整 source of truth 仍然用顶部的“导入存档”恢复。
               </p>
