@@ -1720,6 +1720,12 @@ h3 {
   padding: 22px;
 }
 
+.cultivation-skill-panel {
+  align-content: start;
+  min-height: 0;
+  padding: 18px;
+}
+
 .practice-dashboard .task-summary-panel {
   min-height: 0;
   padding: 18px;
@@ -1797,8 +1803,10 @@ h3 {
   grid-template-columns: 48px minmax(92px, 0.72fr) minmax(58px, auto) minmax(104px, 1fr) minmax(118px, max-content);
   gap: 12px;
   align-items: center;
-  min-height: 58px;
-  padding: 8px 10px;
+  height: 50px;
+  max-height: 50px;
+  overflow: hidden;
+  padding: 6px 10px;
   border: 0;
   border-bottom: 1px solid rgba(217, 203, 176, 0.65);
   border-radius: 0;
@@ -1817,15 +1825,20 @@ h3 {
 .cultivation-row strong {
   overflow: hidden;
   color: #303026;
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cultivation-row small {
+  overflow: hidden;
   color: #7d735f;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cultivation-row b {
