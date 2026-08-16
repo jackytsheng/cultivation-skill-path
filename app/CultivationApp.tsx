@@ -143,7 +143,7 @@ const DEFAULT_TIMESTAMP = "2026-08-14T00:00:00.000Z";
 const COLORS = ["#2f7d5c", "#a04d3f", "#8b6f24", "#4e6b8f", "#7b5c8f"];
 const LAYERS_PER_REALM = 10;
 const REALMS_PER_PAGE = 10;
-const SKILLS_PER_PAGE = 5;
+const SKILLS_PER_PAGE = 10;
 const ACTIVITY_DAYS_PER_PAGE = 112;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -160,7 +160,7 @@ const PRESETS: Preset[] = [
       "炼虚",
       "合体",
       "大乘",
-      "飞升境",
+      "飞升",
       "金仙",
       "太乙",
       "大罗",
@@ -171,16 +171,16 @@ const PRESETS: Preset[] = [
     id: "zhanshen",
     name: "绝世战神武道路线",
     realms: [
-      "淬体境",
-      "先天境",
-      "武王境",
-      "武宗境",
-      "武皇境",
-      "武尊境",
-      "武圣境",
-      "武祖境",
-      "武帝境",
-      "武神境",
+      "淬体",
+      "先天",
+      "武王",
+      "武宗",
+      "武皇",
+      "武尊",
+      "武圣",
+      "武祖",
+      "武帝",
+      "武神",
       "人神",
       "地神",
       "天神",
@@ -488,19 +488,36 @@ function layerStats(layer: Layer): TaskStats {
 }
 
 function layerPathProgressPercent(layers: Layer[]) {
-  if (layers.length === 0) {
+  if (layers.length <= 1) {
     return 0;
   }
-  const completedLayers = layers.filter((layer) => layerStats(layer).complete).length;
-  if (completedLayers === 0) {
-    return 0;
+
+  // N 个点只有 N - 1 个 segment
+  const pathLayers = layers.slice(0, -1);
+  const segmentCount = pathLayers.length;
+
+  let progress = 0;
+
+  for (const layer of pathLayers) {
+    const stats = layerStats(layer);
+
+    if (stats.total === 0) {
+      break;
+    }
+
+    const layerProgress = Math.min(1, stats.done / stats.total);
+
+    progress += layerProgress;
+
+    // 当前 layer 还没有完成，后面的 segment 不应该继续算
+    if (!stats.complete) {
+      break;
+    }
   }
-  if (layers.length === 1) {
-    return 100;
-  }
+
   return Math.min(
     100,
-    Math.round(((completedLayers - 1) / (layers.length - 1)) * 1000) / 10,
+    Math.round((progress / segmentCount) * 1000) / 10,
   );
 }
 
@@ -1988,6 +2005,7 @@ export function CultivationApp() {
             }
           >
             {selectedRealm?.layers.map((layer) => {
+              {console.log(selectedLayerPathProgress)}
               const stats = layerStats(layer);
               const unlocked = canAdvanceLayer(activeSkill, selectedRealm.id, layer.id);
               return (
@@ -2128,7 +2146,7 @@ export function CultivationApp() {
                       {skill.name.slice(0, 1)}
                     </span>
                     <strong>{skill.name}</strong>
-                    <small>等级 {stats.currentLayer?.number ?? 1}</small>
+                    <small>正处于第 {stats.currentLayer?.number ?? 1} 层</small>
                     <ProgressBar percent={stats.percent} tone={skill.color} />
                     <b title={`${stats.done} / ${stats.total}`}>
                       {compactCount(stats.done)}/{compactCount(stats.total)}
@@ -2150,7 +2168,7 @@ export function CultivationApp() {
                   上一页
                 </button>
                 <span>
-                  第 {currentSkillPage + 1} / {skillPageCount} 页 · 5道/页
+                  第 {currentSkillPage + 1} / {skillPageCount} 页 · {SKILLS_PER_PAGE} 道/页
                 </span>
                 <button
                   onClick={() =>

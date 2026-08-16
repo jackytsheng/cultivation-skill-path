@@ -812,7 +812,7 @@ h3 {
 
 .profile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 360px));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 320px));
   gap: 12px;
   justify-content: start;
 }
